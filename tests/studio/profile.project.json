@@ -1,13 +1,10 @@
 {
-  "name": "ege-duel-shots",
+  "name": "ege-duel-profile",
   "tree": {
     "$className": "DataModel",
     "ReplicatedStorage": {
       "Shared": {
         "$path": "../../src/shared"
-      },
-      "EgeTestHold": {
-        "$className": "BoolValue"
       }
     },
     "ServerScriptService": {
@@ -28,8 +25,8 @@
         "Client": {
           "$path": "../../src/client"
         },
-        "EgeDuelAutotestClient": {
-          "$path": "EgeDuelAutotest.client.luau"
+        "EgeDuelProfile": {
+          "$path": "Profile.client.luau"
         }
       }
     },

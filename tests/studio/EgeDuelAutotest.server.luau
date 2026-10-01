@@ -58,11 +58,10 @@ samples.OnServerInvoke = function()
 		social = { "fig_poll", "fig_market" },
 	}
 	local picked = {}
-	local bank = game:GetService("ServerStorage"):WaitForChild("Bank")
+	local Bank = require(game:GetService("ServerScriptService"):WaitForChild("Server"):WaitForChild("Bank"))
 	for subject, groups in wanted do
-		local data = require(bank:WaitForChild(subject))
 		for _, group in groups do
-			for _, task in data.tasks do
+			for _, task in Bank.getTasks(subject) do
 				if task.group == group then
 					table.insert(picked, { text = task.text, points = task.points, figure = task.figure })
 					break

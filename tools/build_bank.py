@@ -22,6 +22,8 @@ import figures  # noqa: E402,F401  (добавляет в generators задан�
 ROOT = Path(__file__).resolve().parent.parent
 AUTHORED = ROOT / "bank" / "authored"
 DIST = ROOT / "bank" / "dist"
+EMBEDDED = ROOT / "bank" / "embedded"
+CHUNK_CHARS = 60000  # размер одного куска встроенной копии банка
 
 SUBJECTS = [
     "russian", "math_base", "math_prof", "physics", "chemistry", "biology",
@@ -172,6 +174,20 @@ def dump_tasks(subject: str, tasks: list[dict]) -> str:
     return head + ', "tasks": [\n' + ",\n".join(lines) + "\n]}\n"
 
 
+def embed(subject: str, text: str) -> None:
+    """Встроенная копия банка: JSON предмета, разрезанный на текстовые куски.
+
+    Rojo превращает .txt в StringValue. Хранить банк модулями Luau нельзя: Studio разбирает
+    такие большие скрипты и из-за этого сильно теряет частоту кадров.
+    """
+    folder = EMBEDDED / subject
+    folder.mkdir(parents=True, exist_ok=True)
+    for old in folder.glob("*.txt"):
+        old.unlink()
+    for number, start in enumerate(range(0, len(text), CHUNK_CHARS), start=1):
+        (folder / f"{number:02d}.txt").write_text(text[start:start + CHUNK_CHARS], encoding="utf-8", newline="")
+
+
 def build(seed: int, per_generator: int) -> int:
     rng = random.Random(seed)
     DIST.mkdir(parents=True, exist_ok=True)
@@ -199,7 +215,9 @@ def build(seed: int, per_generator: int) -> int:
             }
             for item in tasks
         ]
-        (DIST / f"{subject}.json").write_text(dump_tasks(subject, ordered), encoding="utf-8")
+        text = dump_tasks(subject, ordered)
+        (DIST / f"{subject}.json").write_text(text, encoding="utf-8")
+        embed(subject, text)
         index["subjects"][subject] = {"file": f"{subject}.json", "count": len(tasks)}
         print(f"{subject:12} {len(tasks):4} заданий")
 

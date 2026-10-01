@@ -74,6 +74,22 @@ local function sanitize(rawTasks: any): { any }
 	return result
 end
 
+-- Встроенная копия хранится не модулями Luau, а текстом: папка предмета с кусками JSON в StringValue.
+-- Большие модули Studio разбирает как код, и частота кадров от этого падает в несколько раз.
+local function readEmbedded(folder: Instance): string
+	local chunks = folder:GetChildren()
+	table.sort(chunks, function(a, b)
+		return a.Name < b.Name
+	end)
+	local parts = {}
+	for _, chunk in chunks do
+		if chunk:IsA("StringValue") then
+			table.insert(parts, chunk.Value)
+		end
+	end
+	return table.concat(parts)
+end
+
 local function loadBuiltIn()
 	local folder = ServerStorage:FindFirstChild("Bank")
 	if not folder then
@@ -81,13 +97,15 @@ local function loadBuiltIn()
 		return
 	end
 	for _, subject in Subjects.list do
-		local module = folder:FindFirstChild(subject.id)
-		if module and module:IsA("ModuleScript") then
-			local ok, data = pcall(require, module)
+		local subjectFolder = folder:FindFirstChild(subject.id)
+		if subjectFolder then
+			local ok, data = pcall(function()
+				return HttpService:JSONDecode(readEmbedded(subjectFolder))
+			end)
 			if ok and type(data) == "table" then
 				tasksBySubject[subject.id] = sanitize(data.tasks)
 			else
-				warn("[Bank] Не удалось прочитать встроенный файл предмета " .. subject.id)
+				warn("[Bank] Не удалось прочитать встроенную копию предмета " .. subject.id)
 			end
 		end
 	end

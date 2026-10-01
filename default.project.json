@@ -14,7 +14,7 @@
     },
     "ServerStorage": {
       "Bank": {
-        "$path": "bank/dist"
+        "$path": "bank/embedded"
       }
     },
     "StarterPlayer": {

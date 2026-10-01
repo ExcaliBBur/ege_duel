@@ -11,6 +11,7 @@ local Ui = require(script.Parent.Ui)
 local SetupScreen = require(script.Parent.SetupScreen)
 local ExamScreen = require(script.Parent.ExamScreen)
 local ResultsScreen = require(script.Parent.ResultsScreen)
+local Perf = require(script.Parent.Perf)
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -200,7 +201,10 @@ local function showOnly(name: string?)
 
 	jumpLocked = name == "exam" or name == "countdown"
 	applyJumpLock()
+	Perf.setPhase(name or "класс")
 end
+
+Perf.start()
 
 stateEvent.OnClientEvent:Connect(function(state)
 	local phase = state.phase

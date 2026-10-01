@@ -1,9 +1,9 @@
 ﻿# Автопроверка в настоящей Roblox Studio.
 # Собирает тестовое место, ставит временный плагин, запускает Studio, ждёт отчёт в журнале Studio,
-# печатает его, закрывает Studio и удаляет плагин.
+# печатает его, закрывает запущенную им Studio и удаляет плагин.
 # Запуск из папки проекта:  powershell -ExecutionPolicy Bypass -File tests\studio\run_studio_test.ps1
 
-param([switch]$Shots)  # -Shots: сценарий задерживается на каждом экране, а окно Studio снимается в build\shots
+param([switch]$Shots, [switch]$Profile)  # -Shots: сценарий задерживается на каждом экране, а окно Studio снимается в build\shots
 
 $ErrorActionPreference = "Stop"
 $root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
@@ -15,13 +15,15 @@ $logs = Join-Path $env:LOCALAPPDATA "Roblox\logs"
 
 $studio = Get-ChildItem (Join-Path $env:LOCALAPPDATA "Roblox\Versions") -Recurse -Filter RobloxStudioBeta.exe |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if ($env:EGE_STUDIO_EXE) { $studio = Get-Item $env:EGE_STUDIO_EXE }
 if (-not $studio) { throw "Roblox Studio не найдена" }
-if (Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue) { throw "Сначала закройте Roblox Studio" }
+# Чужое открытое окно Studio не мешает: сценарий читает журнал только своего запуска и закрывает только его.
 
 New-Item -ItemType Directory -Force $plugins, (Split-Path $place) | Out-Null
 & $rojo build (Join-Path $PSScriptRoot "plugin.project.json") -o $pluginFile | Out-Null
-$project = if ($Shots) { "shots.project.json" } else { "test.project.json" }
-& $rojo build (Join-Path $PSScriptRoot $project) -o $place | Out-Null
+$project = if ($Profile) { "profile.project.json" } elseif ($Shots) { "shots.project.json" } else { "test.project.json" }
+$projectPath = if ($env:EGE_TEST_PROJECT) { $env:EGE_TEST_PROJECT } else { Join-Path $PSScriptRoot $project }
+& $rojo build $projectPath -o $place | Out-Null
 if ($Shots) {
     Start-Process powershell -WindowStyle Hidden -ArgumentList "-ExecutionPolicy", "Bypass", "-File", "`"$(Join-Path $PSScriptRoot 'capture_window.ps1')`"", "-Seconds", "210" | Out-Null
 }
@@ -34,7 +36,7 @@ try {
     $deadline = (Get-Date).AddSeconds(300)
     while ((Get-Date) -lt $deadline -and -not $finished) {
         Start-Sleep -Seconds 3
-        $log = Get-ChildItem $logs -Filter "*Studio*" | Where-Object { $_.LastWriteTime -gt $started -and $_.Name -notlike "*Installer*" } |
+        $log = Get-ChildItem $logs -Filter "*Studio*" | Where-Object { $_.CreationTime -gt $started -and $_.Name -notlike "*Installer*" } |
             Sort-Object LastWriteTime -Descending | Select-Object -First 1
         if ($log) {
             $lines = @(Select-String -Path $log.FullName -Pattern "EGETEST|\[Bank\]" | ForEach-Object { ($_.Line -replace "^.*\[FLog::Creator\w+\] ", "") })

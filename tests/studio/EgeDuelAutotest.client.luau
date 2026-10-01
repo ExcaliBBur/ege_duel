@@ -29,6 +29,27 @@ local function lookFrom(from: Vector3, to: Vector3)
 	camera.CameraType = Enum.CameraType.Custom
 end
 
+-- Замер нагрузки по этапам. Частота кадров в Studio ограничена (60, а в неактивном окне 15),
+-- поэтому главное здесь не она, а время процессора и видеокарты на кадр и самый долгий кадр.
+local Stats = game:GetService("Stats")
+local frames, since, cpuTime, gpuTime, worst = 0, os.clock(), 0, 0, 0
+game:GetService("RunService").RenderStepped:Connect(function(dt)
+	frames += 1
+	cpuTime += Stats.RenderCPUFrameTime
+	gpuTime += Stats.RenderGPUFrameTime
+	worst = math.max(worst, dt)
+end)
+local function mark(label: string)
+	local elapsed = os.clock() - since
+	if elapsed > 0.5 and frames > 0 then
+		table.insert(lines, string.format(
+			"FPS %s: %.0f к/с, процессор %.1f мс на кадр, видеокарта %.1f мс, самый долгий кадр %.0f мс",
+			label, frames / elapsed, cpuTime / frames * 1000, gpuTime / frames * 1000, worst * 1000
+		))
+	end
+	frames, since, cpuTime, gpuTime, worst = 0, os.clock(), 0, 0, 0
+end
+
 local function check(name: string, condition: any)
 	table.insert(lines, (if condition then "ok   " else "FAIL ") .. name)
 end
@@ -217,7 +238,11 @@ local function run()
 	lookFrom(Vector3.new(0, 11, -28), Vector3.new(0, 6, 32)) -- вид на заднюю стену
 	lookFrom(Vector3.new(30, 9, 8), Vector3.new(-42, 8, -6)) -- вид на боковую стену с окнами
 	lookFrom(Vector3.new(-8, 9, -12), Vector3.new(-25, 5, -27)) -- учительский стол и глобус
+	mark("загрузка")
+	task.wait(3)
+	mark("класс, игрок стоит")
 	checkClassroom()
+	mark("класс, осмотр предметов")
 	checkFigureModule(gui)
 
 	local action = remotes:WaitForChild("Action")
@@ -248,6 +273,9 @@ local function run()
 		end
 	end
 	check("табличка парты: ждёт соперника", findText(Workspace.Classroom.Table1, "Ждёт соперника") ~= nil)
+	mark("посадка")
+	task.wait(2)
+	mark("за партой, ожидание")
 
 	action:FireServer("addBot")
 	if not waitFor("экран настройки открылся", function()
@@ -261,6 +289,7 @@ local function run()
 	action:FireServer("voteCount", 20)
 	task.wait(1)
 	check("кнопка «Готов» на экране настройки", findText(setup, "^Готов$") ~= nil)
+	mark("экран настройки")
 	hold()
 	action:FireServer("ready", true)
 
@@ -274,6 +303,9 @@ local function run()
 		return
 	end
 
+	mark("отсчёт")
+	task.wait(3)
+	mark("экран экзамена")
 	check("в шапке предмет и номер задания", findText(exam, "задание 1 из 20") ~= nil)
 	check("таймер идёт", findText(exam, "^%d%d:%d%d$") ~= nil)
 	check("кнопка «Сдать работу» стоит в шапке", exam:FindFirstChild("Submit", true) and exam:FindFirstChild("Submit", true).Parent ~= exam)
@@ -318,6 +350,9 @@ local function run()
 	end, 10) then
 		return
 	end
+	mark("экзамен, ввод ответа")
+	task.wait(3)
+	mark("экран итогов")
 	local cards = 0
 	for _, item in results:GetDescendants() do
 		if item:IsA("TextLabel") and string.find(item.Text, "^Верных ответов: %d+ из 20$") then
