@@ -23,7 +23,7 @@ New-Item -ItemType Directory -Force $plugins, (Split-Path $place) | Out-Null
 $project = if ($Shots) { "shots.project.json" } else { "test.project.json" }
 & $rojo build (Join-Path $PSScriptRoot $project) -o $place | Out-Null
 if ($Shots) {
-    Start-Process powershell -WindowStyle Hidden -ArgumentList "-ExecutionPolicy", "Bypass", "-File", "`"$(Join-Path $PSScriptRoot 'capture_window.ps1')`"", "-Seconds", "150" | Out-Null
+    Start-Process powershell -WindowStyle Hidden -ArgumentList "-ExecutionPolicy", "Bypass", "-File", "`"$(Join-Path $PSScriptRoot 'capture_window.ps1')`"", "-Seconds", "210" | Out-Null
 }
 
 $started = Get-Date

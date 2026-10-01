@@ -2,7 +2,7 @@
 -- картинки-файлы не нужны.
 --   { "line", x1, y1, x2, y2, стиль }     стиль: 0 сетка, 1 основная линия, 2 выделенная линия
 --   { "rect", x, y, ширина, высота, стиль }
---   { "circle", x, y, радиус, стиль }      стиль 1: белый круг с обводкой, 2: закрашенная точка
+--   { "circle", x, y, радиус, стиль }      стиль 0: тонкая окружность, 1: белый круг с обводкой, 2: закрашенная точка
 --   { "text", x, y, строка, выравнивание }  выравнивание: "c", "l", "r"
 local Ui = require(script.Parent.Ui)
 
@@ -63,15 +63,21 @@ function Figure.render(figure: any, parent: Instance?): Frame?
 			})
 		elseif kind == "circle" then
 			local radius = shape[4]
-			local filled = shape[5] == 2
+			local style = shape[5]
+			local filled = style == 2
+			local hollow = style == 0
 			Ui.frame({
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromOffset(shape[2], shape[3]),
 				Size = UDim2.fromOffset(radius * 2, radius * 2),
 				BackgroundColor3 = if filled then C.accent else C.surface,
-				ZIndex = 4,
+				BackgroundTransparency = if hollow then 1 else 0,
+				ZIndex = if hollow then 1 else 4,
 				Parent = canvas,
-			}, { Ui.new("UICorner", { CornerRadius = UDim.new(1, 0) }), Ui.stroke(if filled then C.accent else C.ink, 2) })
+			}, {
+				Ui.new("UICorner", { CornerRadius = UDim.new(1, 0) }),
+				Ui.stroke(if filled then C.accent elseif hollow then C.muted else C.ink, if hollow then 1 else 2),
+			})
 		elseif kind == "text" then
 			local alignment = ALIGNMENTS[shape[5]] or ALIGNMENTS.c
 			Ui.label({

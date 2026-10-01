@@ -16,6 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import generators  # noqa: E402
+import facts  # noqa: E402,F401  (добавляет в generators задания по таблицам фактов)
 import figures  # noqa: E402,F401  (добавляет в generators задания с рисунками)
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -136,7 +137,8 @@ def identity(item: dict) -> str:
     return item["text"] + json.dumps(item.get("figure"), sort_keys=True)
 
 
-def generate(subject: str, rng: random.Random, per_generator: int) -> list[dict]:
+def generate(subject: str, rng: random.Random, per_generator: int, taken: set[str]) -> list[dict]:
+    """taken: уже имеющиеся задания предмета, такие же генератор не добавляет."""
     tasks = []
     for generator in generators.GENERATED.get(subject, []):
         seen = set()
@@ -144,16 +146,18 @@ def generate(subject: str, rng: random.Random, per_generator: int) -> list[dict]
         while len(seen) < per_generator and attempts < per_generator * 30:
             attempts += 1
             made = generator(rng)
-            if identity(made) in seen:
+            # У заданий по таблицам фактов есть key: каждый факт берётся один раз.
+            mark = made.get("key") or identity(made)
+            if mark in seen or identity(made) in taken:
                 continue
-            seen.add(identity(made))
+            seen.add(mark)
             name = generator.__name__
             tasks.append({
                 "group": name,
                 "text": made["text"],
                 "answers": made.get("answers") or [made["answer"]],
-                "points": 1,
-                "kind": "exact" if name in generators.EXACT_GENERATORS else "number",
+                "points": made.get("points", 1),
+                "kind": made.get("kind") or ("exact" if name in generators.EXACT_GENERATORS else "number"),
                 "explanation": made["explanation"],
             })
             if "figure" in made:
@@ -175,7 +179,8 @@ def build(seed: int, per_generator: int) -> int:
     errors = []
 
     for subject in SUBJECTS:
-        tasks = load_authored(subject) + generate(subject, rng, per_generator)
+        authored = load_authored(subject)
+        tasks = authored + generate(subject, rng, per_generator, {identity(item) for item in authored})
         seen_texts = set()
         for number, item in enumerate(tasks, start=1):
             item["id"] = f"{subject}-{number:03d}"
@@ -208,7 +213,7 @@ def build(seed: int, per_generator: int) -> int:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Сборка банка заданий")
     parser.add_argument("--seed", type=int, default=2026)
-    parser.add_argument("--per-generator", type=int, default=6)
+    parser.add_argument("--per-generator", type=int, default=18)
     arguments = parser.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stderr.reconfigure(encoding="utf-8")
