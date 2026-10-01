@@ -1,0 +1,6 @@
+{
+  "name": "EgeDuelAutotestPlugin",
+  "tree": {
+    "$path": "Plugin.server.luau"
+  }
+}

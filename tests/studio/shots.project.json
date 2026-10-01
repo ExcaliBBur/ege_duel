@@ -1,0 +1,42 @@
+{
+  "name": "ege-duel-shots",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "../../src/shared"
+      },
+      "EgeTestHold": {
+        "$className": "BoolValue"
+      }
+    },
+    "ServerScriptService": {
+      "Server": {
+        "$path": "../../src/server"
+      },
+      "EgeDuelAutotest": {
+        "$path": "EgeDuelAutotest.server.luau"
+      }
+    },
+    "ServerStorage": {
+      "Bank": {
+        "$path": "../../bank/dist"
+      }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "Client": {
+          "$path": "../../src/client"
+        },
+        "EgeDuelAutotestClient": {
+          "$path": "EgeDuelAutotest.client.luau"
+        }
+      }
+    },
+    "HttpService": {
+      "$properties": {
+        "HttpEnabled": true
+      }
+    }
+  }
+}

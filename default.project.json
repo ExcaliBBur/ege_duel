@@ -1,0 +1,33 @@
+{
+  "name": "ege-duel",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "Server": {
+        "$path": "src/server"
+      }
+    },
+    "ServerStorage": {
+      "Bank": {
+        "$path": "bank/dist"
+      }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "Client": {
+          "$path": "src/client"
+        }
+      }
+    },
+    "HttpService": {
+      "$properties": {
+        "HttpEnabled": true
+      }
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+ "version": 2026,
+ "subjects": {
+  "russian": {
+   "file": "russian.json",
+   "count": 30
+  },
+  "math_base": {
+   "file": "math_base.json",
+   "count": 90
+  },
+  "math_prof": {
+   "file": "math_prof.json",
+   "count": 90
+  },
+  "physics": {
+   "file": "physics.json",
+   "count": 101
+  },
+  "chemistry": {
+   "file": "chemistry.json",
+   "count": 60
+  },
+  "biology": {
+   "file": "biology.json",
+   "count": 30
+  },
+  "informatics": {
+   "file": "informatics.json",
+   "count": 90
+  },
+  "history": {
+   "file": "history.json",
+   "count": 30
+  },
+  "social": {
+   "file": "social.json",
+   "count": 30
+  },
+  "geography": {
+   "file": "geography.json",
+   "count": 30
+  },
+  "literature": {
+   "file": "literature.json",
+   "count": 30
+  },
+  "english": {
+   "file": "english.json",
+   "count": 30
+  }
+ }
+}
