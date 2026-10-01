@@ -271,18 +271,27 @@ act(anna, "rematch")
 equal(last(boris).phase, "resultsUpdate", "соперник узнаёт о предложении реванша")
 equal(last(boris).rematch.rival, true, "флаг реванша соперника")
 act(boris, "rematch")
-equal(last(anna).phase, "countdown", "оба согласны: новый отсчёт")
-equal(last(anna).lotTime, false, "при реванше жребия нет")
-equal(last(anna).time, countdown.time, "при реванше те же настройки")
+equal(last(anna).phase, "setup", "оба согласны на реванш: снова экран настройки")
+equal(last(anna).me.subject, "russian", "при реванше прошлый предмет остаётся выбранным")
+equal(last(anna).me.ready, false, "при реванше готовность сброшена")
+act(anna, "setSubject", "physics")
+equal(last(boris).rival.subject, "physics", "при реванше предмет можно выбрать заново")
+act(anna, "setSubject", "russian")
+act(boris, "voteTime", 10)
+act(anna, "ready", true)
+act(boris, "ready", true)
+equal(last(anna).phase, "countdown", "после настройки начинается новый отсчёт")
+equal(last(anna).lotTime, false, "голоса совпали: жребия нет")
+equal(last(anna).time, 10, "время из новых голосов")
 advance(3.1)
 equal(last(anna).phase, "exam", "реванш начался")
 
 -- Время вышло: работы сдаются сами.
 act(boris, "answer", { index = 1, value = rightAnswer(last(boris).tasks[1]) })
-advance(countdown.time * 60 + 2)
+advance(10 * 60 + 2)
 equal(last(anna).phase, "results", "по окончании времени показаны итоги")
 equal(last(anna).outcome, "lose", "0 баллов против 2: поражение")
-equal(last(anna).me.elapsed, countdown.time * 60, "несданная работа: полное время")
+equal(last(anna).me.elapsed, 10 * 60, "несданная работа: полное время")
 
 -- Соперник встаёт на экране итогов.
 act(boris, "leave")
@@ -379,6 +388,9 @@ equal(last(fedor).review[1].your, "1,50", "точка в ответе замен
 check(string.find(scoreboardText, "Fedor") == nil, "матчи с тестовым соперником не попадают на доску побед")
 equal(last(fedor).rematch.rival, true, "тестовый соперник согласен на реванш")
 act(fedor, "rematch")
+equal(last(fedor).phase, "setup", "реванш с тестовым соперником ведёт к настройке")
+equal(last(fedor).rival.ready, true, "тестовый соперник готов к реваншу")
+act(fedor, "ready", true)
 equal(last(fedor).phase, "countdown", "реванш с тестовым соперником")
 advance(3.1)
 act(fedor, "submit")
@@ -388,6 +400,31 @@ equal(last(fedor).phase, "none", "игрок встал")
 advance(60)
 equal(t2.status, "Свободно", "тестовый соперник уходит вместе с игроком")
 check(t2.prompts[2].Enabled, "место тестового соперника снова свободно")
+
+-- Калькулятор из справочных материалов.
+local function calc(keys)
+	local press = M.Calculator.new()
+	local shown = "0"
+	for _, key in keys do
+		shown = press(key)
+	end
+	return shown
+end
+equal(calc({ "2", "+", "3", "=" }), "5", "калькулятор: сложение")
+equal(calc({ "2", "+", "3", "×", "4", "=" }), "20", "калькулятор: действия выполняются по порядку ввода")
+equal(calc({ "7", "-", "1", "0", "=" }), "-3", "калькулятор: отрицательный результат")
+equal(calc({ "1", ",", "5", "×", "4", "=" }), "6", "калькулятор: дробь через запятую")
+equal(calc({ "1", "÷", "4", "=" }), "0,25", "калькулятор: результат с запятой")
+equal(calc({ "1", "÷", "0", "=" }), "ошибка", "калькулятор: деление на ноль")
+equal(calc({ "1", "÷", "0", "=", "5" }), "ошибка", "калькулятор: после ошибки нужен сброс")
+equal(calc({ "1", "÷", "0", "=", "C", "5" }), "5", "калькулятор: сброс")
+equal(calc({ "1", "4", "4", "√" }), "12", "калькулятор: корень")
+equal(calc({ "9", "±", "√" }), "ошибка", "калькулятор: корень из отрицательного")
+equal(calc({ "1", "2", "3", "←" }), "12", "калькулятор: стирание цифры")
+equal(calc({ "5", "+", "×", "3", "=" }), "15", "калькулятор: замена действия")
+equal(calc({ "2", "×", "3", "=", "+", "1", "=" }), "7", "калькулятор: продолжение после результата")
+equal(calc({ ",", "5", "+", ",", "5", "=" }), "1", "калькулятор: число начинается с запятой")
+equal(M.Calculator.format(1 / 3), "0,3333333333", "калькулятор: не больше 10 значащих цифр")
 
 -- Проверка заданий при загрузке банка.
 local goodFigure = { w = 420, h = 260, items = { { "line", 0, 0, 10, 10, 1 }, { "text", 5, 5, "А", "c" }, { "circle", 5, 5, 3, 2 } } }

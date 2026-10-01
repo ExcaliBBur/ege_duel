@@ -15,6 +15,109 @@
       </Properties>
       <Item class="ModuleScript" referent="3">
         <Properties>
+          <string name="Name">Calculator</string>
+          <string name="Source"><![CDATA[-- Калькулятор для справочных материалов экзамена. Модуль не использует API Roblox,
+-- поэтому его можно проверять тестами отдельно от интерфейса.
+local Calculator = {}
+
+-- Число для экрана калькулятора: до 10 значащих цифр, дробная часть через запятую.
+local function formatNumber(value: number): string
+	if value ~= value or value == math.huge or value == -math.huge then
+		return "ошибка"
+	end
+	local text = string.format("%.10g", value)
+	return (string.gsub(text, "%.", ","))
+end
+
+Calculator.format = formatNumber
+
+-- Вычислительная часть калькулятора отдельно от кнопок, чтобы её можно было проверить тестами.
+-- press(key) принимает цифры, ",", "+", "-", "×", "÷", "=", "√", "±", "C", "←" и возвращает строку для экрана.
+function Calculator.new()
+	local entry = "0" -- то, что набирается сейчас
+	local stored: number? = nil -- левое число незавершённого действия
+	local operation: string? = nil
+	local fresh = true -- следующая цифра начинает новое число
+
+	local function current(): number
+		return tonumber((string.gsub(entry, ",", "."))) or 0
+	end
+
+	local function apply(left: number, op: string, right: number): number
+		if op == "+" then
+			return left + right
+		elseif op == "-" then
+			return left - right
+		elseif op == "×" then
+			return left * right
+		end
+		return if right == 0 then 0 / 0 else left / right
+	end
+
+	local function resolve()
+		if stored ~= nil and operation then
+			entry = formatNumber(apply(stored, operation, current()))
+		end
+		stored, operation = nil, nil
+	end
+
+	local function press(key: string): string
+		if entry == "ошибка" and key ~= "C" then
+			return entry
+		end
+		if string.match(key, "^%d$") then
+			if fresh or entry == "0" then
+				entry = key
+			elseif #entry < 14 then
+				entry ..= key
+			end
+			fresh = false
+		elseif key == "," then
+			if fresh then
+				entry = "0,"
+			elseif not string.find(entry, ",", 1, true) then
+				entry ..= ","
+			end
+			fresh = false
+		elseif key == "C" then
+			entry, stored, operation, fresh = "0", nil, nil, true
+		elseif key == "←" then
+			if not fresh then
+				entry = string.sub(entry, 1, -2)
+				if entry == "" or entry == "-" then
+					entry = "0"
+				end
+			end
+		elseif key == "±" then
+			entry = formatNumber(-current())
+		elseif key == "√" then
+			local value = current()
+			entry = if value < 0 then "ошибка" else formatNumber(math.sqrt(value))
+			fresh = true
+		elseif key == "=" then
+			resolve()
+			fresh = true
+		elseif key == "+" or key == "-" or key == "×" or key == "÷" then
+			if not fresh or stored == nil then
+				resolve()
+			end
+			if entry ~= "ошибка" then
+				stored, operation = current(), key
+			end
+			fresh = true
+		end
+		return entry
+	end
+
+	return press
+end
+
+return Calculator
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="4">
+        <Properties>
           <string name="Name">Scoring</string>
           <string name="Source"><![CDATA[-- Проверка ответов и подсчёт баллов. Модуль не использует API Roblox, поэтому его можно тестировать отдельно.
 local Text = require(script.Parent.Text)
@@ -172,7 +275,7 @@ return Scoring
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="4">
+      <Item class="ModuleScript" referent="5">
         <Properties>
           <string name="Name">Settings</string>
           <string name="Source"><![CDATA[-- Настройки матча, общие для сервера и клиента.
@@ -199,7 +302,7 @@ return Settings
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="5">
+      <Item class="ModuleScript" referent="6">
         <Properties>
           <string name="Name">Subjects</string>
           <string name="Source"><![CDATA[-- Список предметов. id совпадает с именем файла в bank/dist.
@@ -234,7 +337,7 @@ return Subjects
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="6">
+      <Item class="ModuleScript" referent="7">
         <Properties>
           <string name="Name">Text</string>
           <string name="Source"><![CDATA[-- Работа с текстом ответов. string.lower не умеет кириллицу, поэтому регистр меняем по кодам символов.
@@ -335,15 +438,15 @@ return Text
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="7">
+  <Item class="ServerScriptService" referent="8">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Folder" referent="8">
+    <Item class="Folder" referent="9">
       <Properties>
         <string name="Name">Server</string>
       </Properties>
-      <Item class="ModuleScript" referent="9">
+      <Item class="ModuleScript" referent="10">
         <Properties>
           <string name="Name">Bank</string>
           <string name="Source"><![CDATA[-- Банк заданий. Сначала берётся копия, встроенная в игру (ServerStorage.Bank),
@@ -534,7 +637,7 @@ return Bank
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="10">
+      <Item class="ModuleScript" referent="11">
         <Properties>
           <string name="Name">Config</string>
           <string name="Source"><![CDATA[-- Настройки сервера.
@@ -551,7 +654,7 @@ return Config
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="11">
+      <Item class="ModuleScript" referent="12">
         <Properties>
           <string name="Name">Duel</string>
           <string name="Source"><![CDATA[-- Матчи за партами. У каждой парты своё состояние:
@@ -1242,7 +1345,9 @@ function handlers.rematch(tbl, slot)
 	end
 	slot.rematch = true
 	if rival.rematch then
-		startCountdown(tbl, tbl.settings)
+		-- Оба согласны: возвращаемся к настройке. Прошлые предметы и голоса остаются выбранными,
+		-- их можно поменять перед новым матчем.
+		enterSetup(tbl)
 		return
 	end
 	sendState(slot, {
@@ -1427,7 +1532,7 @@ return Duel
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Script" referent="12">
+      <Item class="Script" referent="13">
         <Properties>
           <string name="Name">Main</string>
           <token name="RunContext">0</token>
@@ -1443,7 +1548,7 @@ Duel.start(world.tables, world.setScoreboard)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="13">
+      <Item class="ModuleScript" referent="14">
         <Properties>
           <string name="Name">Variant</string>
           <string name="Source"><![CDATA[-- Составление варианта: случайные задания из банка, по возможности из разных тем.
@@ -1515,7 +1620,7 @@ return Variant
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="14">
+      <Item class="ModuleScript" referent="15">
         <Properties>
           <string name="Name">World</string>
           <string name="Source"><![CDATA[-- Строит класс кодом при запуске сервера: комната, окна, доски, плакаты, мебель, парты
@@ -1653,11 +1758,13 @@ local function newText(parent: Instance, text: string, size: UDim2, position: UD
 end
 
 -- Всплывающая подпись над предметом. Возвращает функцию показа текста на несколько секунд.
-local function newBubble(part: BasePart, height: number): (string) -> ()
+-- toward: сдвиг подписи в сторону комнаты, чтобы она не уходила в стену за предметом.
+local function newBubble(part: BasePart, height: number, toward: Vector3?): (string) -> ()
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "Bubble"
 	billboard.Size = UDim2.fromOffset(340, 96)
-	billboard.StudsOffset = Vector3.new(0, height, 0)
+	billboard.StudsOffsetWorldSpace = Vector3.new(0, height, 0) + (toward or Vector3.zero)
+	billboard.AlwaysOnTop = true
 	billboard.MaxDistance = 60
 	billboard.Enabled = false
 	billboard.Parent = part
@@ -1818,8 +1925,9 @@ local function buildRoom(parent: Instance)
 	end
 
 	-- Дверь на задней стене.
-	newPart(parent, "Door", Vector3.new(5, 9, 0.3), CFrame.new(0, 4.5, 31.85), COLORS.wood, Enum.Material.Wood)
-	newPart(parent, "DoorKnob", Vector3.new(0.5, 0.5, 0.5), CFrame.new(1.8, 4.4, 31.55), COLORS.brass, Enum.Material.Metal).Shape =
+	newPart(parent, "Door", Vector3.new(5, 9, 0.6), CFrame.new(0, 4.5, 31.6), COLORS.wood, Enum.Material.Wood)
+	newPart(parent, "DoorFrame", Vector3.new(5.8, 9.4, 0.4), CFrame.new(0, 4.7, 31.75), COLORS.trim)
+	newPart(parent, "DoorKnob", Vector3.new(0.5, 0.5, 0.5), CFrame.new(1.8, 4.4, 31.15), COLORS.brass, Enum.Material.Metal).Shape =
 		Enum.PartType.Ball
 
 	buildPlant(parent, -39, -29)
@@ -1912,26 +2020,37 @@ local function buildTeacherCorner(parent: Instance)
 		lands[index] = { part = land, offset = CFrame.new(spot[1]) }
 	end
 
-	local speed = 0.4
+	-- Глобус вращается только несколько секунд после толчка. В покое детали не двигаются,
+	-- и серверу нечего рассылать игрокам.
 	local angle = 0
 	local base = globe.CFrame
-	task.spawn(function()
-		while true do
-			local dt = task.wait(0.05)
-			angle += speed * dt
-			speed = math.max(0.4, speed - 3 * dt) -- после толчка глобус постепенно замедляется
-			local turned = base * CFrame.Angles(0, angle, 0)
-			globe.CFrame = turned
-			for _, land in lands do
-				land.part.CFrame = turned * land.offset
-			end
+	local spinning = false
+	local speed = 0
+	local function spin()
+		speed = 9
+		if spinning then
+			return
 		end
-	end)
+		spinning = true
+		task.spawn(function()
+			while speed > 0.2 do
+				local dt = task.wait(0.05)
+				angle += speed * dt
+				speed -= 2.2 * dt
+				local turned = base * CFrame.Angles(0, angle, 0)
+				globe.CFrame = turned
+				for _, land in lands do
+					land.part.CFrame = turned * land.offset
+				end
+			end
+			spinning = false
+		end)
+	end
 
 	local showFact = newBubble(globe, 3.5)
 	local nextFact = factCycle(GLOBE_FACTS)
 	newPrompt(globe, "Покрутить", "Глобус").Triggered:Connect(function()
-		speed = 9
+		spin()
 		showFact(nextFact())
 	end)
 
@@ -1946,7 +2065,7 @@ local function buildShelves(parent: Instance)
 	local nextFact = factCycle(BOOK_FACTS)
 	for _, x in { -35, 35 } do
 		local back = buildBookshelf(parent, x, 30.6)
-		local showFact = newBubble(back, 6)
+		local showFact = newBubble(back, 3, Vector3.new(0, 0, -3))
 		newPrompt(back, "Открыть книгу", "Книжная полка").Triggered:Connect(function()
 			showFact(nextFact())
 		end)
@@ -1967,7 +2086,7 @@ local function buildLights(parent: Instance, spots: { Vector3 })
 		table.insert(lamps, { shade = shade, light = light })
 	end
 
-	local switch = newPart(parent, "LightSwitch", Vector3.new(0.8, 1.2, 0.2), CFrame.new(5, 5.4, 31.9), COLORS.trim)
+	local switch = newPart(parent, "LightSwitch", Vector3.new(0.8, 1.2, 0.2), CFrame.new(5, 6, 31.88), COLORS.trim)
 	local click = newSound(switch, "rbxasset://sounds/switch.wav", 0.6)
 	local on = true
 	local prompt = newPrompt(switch, "Выключить свет", "Выключатель")
@@ -2007,7 +2126,7 @@ local function buildLights(parent: Instance, spots: { Vector3 })
 	task.spawn(function()
 		while true do
 			time.Text = os.date("%H:%M")
-			task.wait(5)
+			task.wait(15)
 		end
 	end)
 end
@@ -2208,19 +2327,19 @@ return World
       </Item>
     </Item>
   </Item>
-  <Item class="ServerStorage" referent="15">
+  <Item class="ServerStorage" referent="16">
     <Properties>
       <string name="Name">ServerStorage</string>
     </Properties>
-    <Item class="Folder" referent="16">
+    <Item class="Folder" referent="17">
       <Properties>
         <string name="Name">Bank</string>
       </Properties>
-      <Item class="Folder" referent="17">
+      <Item class="Folder" referent="18">
         <Properties>
           <string name="Name">biology</string>
         </Properties>
-        <Item class="StringValue" referent="18">
+        <Item class="StringValue" referent="19">
           <Properties>
             <string name="Name">01</string>
             <string name="Value">{"subject": "biology", "tasks": [
@@ -2399,7 +2518,7 @@ return World
 {"id":"biology-173","group":"fig_punnett","text":"На рисунке показана решётка Пеннета для скрещивания CC × Cc, доминирование полное. У скольких процентов потомков будут гомозиготными?","answers":["50"],"points":1,"kind":"number","explanation":"Подходят 2 клетки из 4, это 50%.","figure":{"w":420,"h":210,"items":[["line",90.0,25.0,90.0,190.0,1],["line",170.0,25.0,170.0,190.0,0],["line",250.0,25.0,250.0,190.0,0],["line",330.0,25.0,330.0,190.0,1],["line",90.0,25.0,330.0,25.0,1],["line",90.0,80.0,330.0,80.0,0],["line",90.0,135.0,330.0,135.0,0],["line",90.0,190.0,330.0,190.0,1],["text",</string>
           </Properties>
         </Item>
-        <Item class="StringValue" referent="19">
+        <Item class="StringValue" referent="20">
           <Properties>
             <string name="Name">02</string>
             <string name="Value"><![CDATA[130.0,52.5,"гаметы","c"],["text",210.0,52.5,"C","c"],["text",290.0,52.5,"c","c"],["text",130.0,107.5,"C","c"],["text",210.0,107.5,"CC","c"],["text",290.0,107.5,"Cc","c"],["text",130.0,162.5,"C","c"],["text",210.0,162.5,"CC","c"],["text",290.0,162.5,"Cc","c"]]}},
@@ -2427,11 +2546,11 @@ return World
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="20">
+      <Item class="Folder" referent="21">
         <Properties>
           <string name="Name">chemistry</string>
         </Properties>
-        <Item class="StringValue" referent="21">
+        <Item class="StringValue" referent="22">
           <Properties>
             <string name="Name">01</string>
             <string name="Value">{"subject": "chemistry", "tasks": [
@@ -2610,7 +2729,7 @@ return World
 {"id":"chemistry-173","group":"fig_atom","text":"Н</string>
           </Properties>
         </Item>
-        <Item class="StringValue" referent="22">
+        <Item class="StringValue" referent="23">
           <Properties>
             <string name="Name">02</string>
             <string name="Value"><![CDATA[а рисунке показана схема строения атома: в центре ядро, вокруг электронные слои, точками обозначены электроны. Сколько электронов находится на внешнем электронном слое?","answers":["1"],"points":1,"kind":"number","explanation":"Электроны по слоям: 2, 8, 8, 1. На внешнем слое 1.","figure":{"w":420,"h":260,"items":[["circle",210.0,130.0,117.0,1],["circle",210.0,130.0,90.0,1],["circle",210.0,130.0,63.0,1],["circle",210.0,130.0,36.0,1],["circle",210.0,130.0,16.0,2],["circle",246.0,130.0,4.0,2],["circle",174.0,130.0,4.0,2],["circle",268.0,154.5,4.0,2],["circle",233.7,188.4,4.0,2],["circle",185.5,188.0,4.0,2],["circle",151.6,153.7,4.0,2],["circle",152.0,105.5,4.0,2],["circle",186.3,71.6,4.0,2],["circle",234.5,72.0,4.0,2],["circle",268.4,106.3,4.0,2],["circle",272.7,194.6,4.0,2],["circle",208.7,220.0,4.0,2],["circle",145.4,192.7,4.0,2],["circle",120.0,128.7,4.0,2],["circle",147.3,65.4,4.0,2],["circle",211.3,40.0,4.0,2],["circle",274.6,67.3,4.0,2],["circle",300.0,131.3,4.0,2],["circle",252.4,239.0,4.0,2]]}},
@@ -2638,11 +2757,11 @@ return World
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="23">
+      <Item class="Folder" referent="24">
         <Properties>
           <string name="Name">english</string>
         </Properties>
-        <Item class="StringValue" referent="24">
+        <Item class="StringValue" referent="25">
           <Properties>
             <string name="Name">01</string>
             <string name="Value"><![CDATA[{"subject": "english", "tasks": [
@@ -2789,11 +2908,11 @@ return World
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="25">
+      <Item class="Folder" referent="26">
         <Properties>
           <string name="Name">geography</string>
         </Properties>
-        <Item class="StringValue" referent="26">
+        <Item class="StringValue" referent="27">
           <Properties>
             <string name="Name">01</string>
             <string name="Value">{"subject": "geography", "tasks": [
@@ -2994,7 +3113,7 @@ return World
 {"id":"geography-195","group":"fig_climate","text":"На рисунке показана климатическая диаграмма: линия с точками показывает среднюю температуру по месяцам, светлые столбики показывают количество осадков. По горизонтали указаны номера месяцев. Определите годовую амплитуду температур: разность между температурой самого тёплого и самого холодного месяца.","answers":["38"],"points":1,"kind":"number","explanation":"22 - (-16) = 38 °C.","figure":{"w":420,"h":260,"items":[["rect",53.0,218.0,15.0,18.0,0],["text",60.5,248.0,"1","c"],["rect",82.0,209.0,15.0,27.0,0],["text",89.5,248.0,"2","c"],["rect",111.0,173.0,15.0,63.0,0],["text",118.5,248.0,"3","c"],["rect",140.0,218.0,15.0,18.0,0],["text",147.5,248.0,"4","c"],["rect",169.0,191.0,15.0,45.0,0],["text",176.5,248.0,"5","c"],["rect",198.0,191.0,15.0,45.0,0],["text",205.5,248.0,"6","c"],["rect",227.0,191.0,15.0,45.0,0],["text",234.5,248.0,"7","c"],["rect",256.0,200.0,15.0,36.0,0],["text",263.5,248.0,"8","c"],["rect",285.0,227.0,15.0,9.0,0],["text",292.5,248.0,"9","c"],["rect",314.0,218.0,15.0,18.0,0],["text",321.5,248.0,"10","c"],["rect",343.0,146.0,15.0,90.0,0],["text",350.5,248.0,"11","c"],["rect",372.0,173.0,15.0,63.0,0],["text",379.5,248.0,"12","c"],["line",46.0,197.6,394.0,197.6,0],["text",40.0,197.6,"-24","r"],["line",46.0,184.0,394.0,184.0,0],["line",46.0,170.4,394.0,170.4,0],["text",40.0,170.4,"-16","r"],["line",46.0,156.8,394.0,156.8,0],["line",46.0,143.2,394.0,143.2,0],["text",40.0,143.</string>
           </Properties>
         </Item>
-        <Item class="StringValue" referent="27">
+        <Item class="StringValue" referent="28">
           <Properties>
             <string name="Name">02</string>
             <string name="Value">2,"-8","r"],["line",46.0,129.6,394.0,129.6,0],["line",46.0,116.0,394.0,116.0,0],["text",40.0,116.0,"0","r"],["line",46.0,102.4,394.0,102.4,0],["line",46.0,88.8,394.0,88.8,0],["text",40.0,88.8,"8","r"],["line",46.0,75.2,394.0,75.2,0],["line",46.0,61.6,394.0,61.6,0],["text",40.0,61.6,"16","r"],["line",46.0,48.0,394.0,48.0,0],["line",46.0,34.4,394.0,34.4,0],["text",40.0,34.4,"24","r"],["line",46.0,20.8,394.0,20.8,0],["line",46.0,116.0,394.0,116.0,1],["line",46.0,14.0,46.0,236.0,1],["line",46.0,236.0,394.0,236.0,1],["line",60.5,170.4,89.5,170.4,2],["line",89.5,170.4,118.5,150.0,2],["line",118.5,150.0,147.5,122.8,2],["line",147.5,122.8,176.5,88.8,2],["line",176.5,88.8,205.5,61.6,2],["line",205.5,61.6,234.5,41.2,2],["line",234.5,41.2,263.5,41.2,2],["line",263.5,41.2,292.5,61.6,2],["line",292.5,61.6,321.5,88.8,2],["line",321.5,88.8,350.5,122.8,2],["line",350.5,122.8,379.5,150.0,2],["circle",60.5,170.4,3.0,2],["circle",89.5,170.4,3.0,2],["circle",118.5,150.0,3.0,2],["circle",147.5,122.8,3.0,2],["circle",176.5,88.8,3.0,2],["circle",205.5,61.6,3.0,2],["circle",234.5,41.2,3.0,2],["circle",263.5,41.2,3.0,2],["circle",292.5,61.6,3.0,2],["circle",321.5,88.8,3.0,2],["circle",350.5,122.8,3.0,2],["circle",379.5,150.0,3.0,2],["text",54.0,10.0,"t, °C","l"]]}},
@@ -3027,7 +3146,7 @@ return World
 {"id":"geography-222","group":"fig_wind_rose","text":"На рисунке показана роза ветров за месяц. Расстояние между соседними окружностями соответствует одному дню. Сколько дней дул юго-западный ветер?","answers":["6"],"points":1,"kind":"number","explanation":"Точка на луче «ЮЗ» лежит на окружности номер 6 от центра.","figure":{"w":420,"h":260,"items":[["circle",210.0,130.0,17.0,0],["circle",210.0,130.0,34.0,0],["circle",210.0,130.0,51.0,0],["circle",210.0,130.0,68.0,0],["circle",210.0,130.0,85.0,0],["circle",210.0,130.0,102.0,0],["line",210.0,130.0,210.0,28.0,0],["text",210.0,15.0,"С","c"],["line",210.0,130.0,282.1,57.9,0],["text",291.3,48.7,"СВ","c"],["line",210.0,130.0,312.0,130.0,0],["text",325.0,130.0,"В","c"],["line",210.0,130.0,282.1,2</string>
           </Properties>
         </Item>
-        <Item class="StringValue" referent="28">
+        <Item class="StringValue" referent="29">
           <Properties>
             <string name="Name">03</string>
             <string name="Value"><![CDATA[02.1,0],["text",291.3,211.3,"ЮВ","c"],["line",210.0,130.0,210.0,232.0,0],["text",210.0,245.0,"Ю","c"],["line",210.0,130.0,137.9,202.1,0],["text",128.7,211.3,"ЮЗ","c"],["line",210.0,130.0,108.0,130.0,0],["text",95.0,130.0,"З","c"],["line",210.0,130.0,137.9,57.9,0],["text",128.7,48.7,"СЗ","c"],["line",210.0,113.0,234.0,106.0,2],["line",234.0,106.0,278.0,130.0,2],["line",278.0,130.0,222.0,142.0,2],["line",222.0,142.0,210.0,181.0,2],["line",210.0,181.0,137.9,202.1,2],["line",137.9,202.1,159.0,130.0,2],["line",159.0,130.0,198.0,118.0,2],["line",198.0,118.0,210.0,113.0,2],["circle",210.0,113.0,3.0,2],["circle",234.0,106.0,3.0,2],["circle",278.0,130.0,3.0,2],["circle",222.0,142.0,3.0,2],["circle",210.0,181.0,3.0,2],["circle",137.9,202.1,3.0,2],["circle",159.0,130.0,3.0,2],["circle",198.0,118.0,3.0,2]]}},
@@ -3042,11 +3161,11 @@ return World
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="29">
+      <Item class="Folder" referent="30">
         <Properties>
           <string name="Name">history</string>
         </Properties>
-        <Item class="StringValue" referent="30">
+        <Item class="StringValue" referent="31">
           <Properties>
             <string name="Name">01</string>
             <string name="Value"><![CDATA[{"subject": "history", "tasks": [
@@ -3175,11 +3294,11 @@ return World
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="31">
+      <Item class="Folder" referent="32">
         <Properties>
           <string name="Name">informatics</string>
         </Properties>
-        <Item class="StringValue" referent="32">
+        <Item class="StringValue" referent="33">
           <Properties>
             <string name="Name">01</string>
             <string name="Value">{"subject": "informatics", "tasks": [
@@ -3390,7 +3509,7 @@ return World
 {"id":"informatics-205","group":"inf_words","text":"Сколько различных слов длиной 4 можно составить из бу</string>
           </Properties>
         </Item>
-        <Item class="StringValue" referent="33">
+        <Item class="StringValue" referent="34">
           <Properties>
             <string name="Name">02</string>
             <string name="Value">кв алфавита, в котором 3 буквы? Буквы в слове могут повторяться, слово не обязано быть осмысленным.","answers":["81"],"points":1,"kind":"number","explanation":"На каждом из 4 мест может стоять любая из 3 букв: 3⁴ = 81."},
@@ -3473,7 +3592,7 @@ return World
 {"id":"informatics-282","group":"fig_paths","text":"На рисунке показана схема дорог между городами А, Б, В, Г, Д, Е, Ж. По каждой дороге можно ехать только в направлении стрелки. Сколько существует различных путей из города А в город Ж?","answers":["8"],"points":1,"kind":"number","explanation":"Для каждого города считаем число путей как сумму путей в города, из которых в него ведут стрелки. В город Ж ведёт 8.","figure":{"w":420,"h":260,"items":[["line",51.9,120.8,137.3,54.8,1],["line",137.3,54.8,134.1,63.2,1],["line",137.3,54.8,128.4,55.8,1],["line",55.0,130.0,134.0,130.0,1],["line",134.0,130.0,126.3,134.6,1],["line",134.0,130.0,126.3,125.4,1],["line",51.9,139.2,137.3,205.2,1],["line",137.3,205.2,128.4,204.2,1],["line",137.3,205.2,134.1,196.8,1],["line",283.5,81.5,370.6,123.1,1],["line",370.6,123.1,361.6,124.0,1],["line",370.6,123.1,365.6,115.6,1],["line",283.5,178.5,370.6,136.9,1],["line",370.6,136.9,365.6,144.4,1],["line",370.6,136.9,361.6,136.0,1],["line",150.0,60.0,150.0,114.0,1],["line",150.0,114.0,145.4,106.3,1],["line",150.0,114.0,154.6,106.3,1],["line",150.0,200.0,150.0,146.0,1],["line",150.0,146.0,154.6,153.7,1],["line",150.0,146.0,145.4,153.7,1],["line",164.6,48.6,254.5,71.1,1],["line",254.5,71.1,245.9,73.7,1],["line",254.5,71.1,248.1,64.7,1],["line",163.6,136.2,255.5,178.3,1],["line",255.5,178.3,246.5,179.3,1],["line",255.5,178.3,250.4,170.9,1],["line",164.6,211.4,254.5,188.9,1],["line",254.5,188.9,248.1,195.3,1],["line",254.5,188.9,245.9,186.3,1],["line",165.0,130.0,369.0,130.0,1],["line",369.0,130.0,361.3,134.6,1],["line",369.0,130.0,361.3,125.4,1],["circle",40.0,130.0,15.0,1],["text",40.0,130.0,"А","c"],["circle",150.0,45.0,15.0,1],["text",150.0,45.0,"Б","c"],["circle",150.0,130.0,15.0,1],["text",150.0,130.0,"В","c"],["circle",150.0,215.0,15.0,1],["text",150.0,215.0,"Г","c"],["circle",270.0,75.0,15.0,1],["text",270.0,75.0,"Д","c"],["circle",270.0,185.0,15.0,1],["text",270.0,185.0,"Е","c"],["circle",385.0,130.0,15.0,1],["text",385.0,130</string>
           </Properties>
         </Item>
-        <Item class="StringValue" referent="34">
+        <Item class="StringValue" referent="35">
           <Properties>
             <string name="Name">03</string>
             <string name="Value"><![CDATA[.0,"Ж","c"]]}},
@@ -3506,11 +3625,11 @@ return World
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="35">
+      <Item class="Folder" referent="36">
         <Properties>
           <string name="Name">literature</string>
         </Properties>
-        <Item class="StringValue" referent="36">
+        <Item class="StringValue" referent="37">
           <Properties>
             <string name="Name">01</string>
             <string name="Value"><![CDATA[{"subject": "literature", "tasks": [
@@ -3639,11 +3758,11 @@ return World
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="37">
+      <Item class="Folder" referent="38">
         <Properties>
           <string name="Name">math_base</string>
         </Properties>
-        <Item class="StringValue" referent="38">
+        <Item class="StringValue" referent="39">
           <Properties>
             <string name="Name">01</string>
             <string name="Value">{"subject": "math_base", "tasks": [
@@ -3870,7 +3989,7 @@ return World
 {"id":"math_base-221","group":"fig_bar_chart","text":"На диаграмме показано число посетителей сайта (в тысячах) за 10 дней. По горизонтали указаны дни, по вертикали число посетителей. Сколько дней число посетителей было больше 40 тысяч?","answers":["5"],"points":1,"kind":"number","explanation":"Столбики выше отметки 40 стоят в 5 днях.","figure":{"w":420,"h":260,"items":[["line",44.0,232.0,414.0,232.0,0],["text",38.0,232.0,"0","r"],["line",44.0,210.0,414.0,210.0,0],["line",44.0,188.0,414.0,188.0,0],["text",38.0,188.0,"20","r"],["line",44.0,166.0,414.0,166.0,0],["line",44.0,144.0,414.0,144.0,0],["text",38.0,144.0,"40","r"],["line",44.0,122.0,414.0,122.0,0],["line",44.0,100.0,414.0,100.0,0],["text",38.0,100.0,"60","r"],["line",44.0,78.0,414.0,78.0,0],["line",44.0,56.0,414.0,56.0,0],["text",38.0,56.0,"80","r"],["line",44.0,34.0,414.0,34.0,0],["line",44.0,12.0,414.0,12.0,0],["text",38.0,12.0,"100","r"],["line",44.0,12.0,44.0,232.0,1],["line",44.0,232.0,414.0,232.0,1],["rect",56.0,144.0,22.0,88.0,2</string>
           </Properties>
         </Item>
-        <Item class="StringValue" referent="39">
+        <Item class="StringValue" referent="40">
           <Properties>
             <string name="Name">02</string>
             <string name="Value">],["text",67.0,245.0,"1","c"],["rect",93.0,122.0,22.0,110.0,2],["text",104.0,245.0,"2","c"],["rect",130.0,144.0,22.0,88.0,2],["text",141.0,245.0,"3","c"],["rect",167.0,56.0,22.0,176.0,2],["text",178.0,245.0,"4","c"],["rect",204.0,210.0,22.0,22.0,2],["text",215.0,245.0,"5","c"],["rect",241.0,188.0,22.0,44.0,2],["text",252.0,245.0,"6","c"],["rect",278.0,210.0,22.0,22.0,2],["text",289.0,245.0,"7","c"],["rect",315.0,34.0,22.0,198.0,2],["text",326.0,245.0,"8","c"],["rect",352.0,56.0,22.0,176.0,2],["text",363.0,245.0,"9","c"],["rect",389.0,100.0,22.0,132.0,2],["text",400.0,245.0,"10","c"]]}},
@@ -3921,7 +4040,7 @@ return World
 {"id":"math_base-266","group":"fig_linear_graph","text":"На рисунке изображён график функции y = kx + b. Найдите k.","answers":["-3"],"points":1,"kind":"number","explanation":"При увелич</string>
           </Properties>
         </Item>
-        <Item class="StringValue" referent="40">
+        <Item class="StringValue" referent="41">
           <Properties>
             <string name="Name">03</string>
             <string name="Value">ении x на 1 значение y меняется на -3, значит k = -3.","figure":{"w":420,"h":260,"items":[["line",100.0,251.0,100.0,9.0,0],["line",89.0,240.0,331.0,240.0,0],["line",122.0,251.0,122.0,9.0,0],["line",89.0,218.0,331.0,218.0,0],["line",144.0,251.0,144.0,9.0,0],["line",89.0,196.0,331.0,196.0,0],["line",166.0,251.0,166.0,9.0,0],["line",89.0,174.0,331.0,174.0,0],["line",188.0,251.0,188.0,9.0,0],["line",89.0,152.0,331.0,152.0,0],["line",210.0,251.0,210.0,9.0,0],["line",89.0,130.0,331.0,130.0,0],["line",232.0,251.0,232.0,9.0,0],["line",89.0,108.0,331.0,108.0,0],["line",254.0,251.0,254.0,9.0,0],["line",89.0,86.0,331.0,86.0,0],["line",276.0,251.0,276.0,9.0,0],["line",89.0,64.0,331.0,64.0,0],["line",298.0,251.0,298.0,9.0,0],["line",89.0,42.0,331.0,42.0,0],["line",320.0,251.0,320.0,9.0,0],["line",89.0,20.0,331.0,20.0,0],["line",84.6,130.0,335.4,130.0,1],["line",210.0,255.4,210.0,4.6,1],["text",328.8,143.2,"x","c"],["text",221.0,13.4,"y","c"],["text",201.2,141.0,"0","c"],["text",232.0,141.0,"1","c"],["text",201.2,108.0,"1","c"],["line",169.7,9.0,250.3,251.0,2],["circle",188.0,64.0,4.0,2],["circle",210.0,130.0,4.0,2]]}},
@@ -3956,7 +4075,7 @@ return World
 {"id":"math_base-295","group":"fig_grid_trapezoid","text":"На клетчатой бумаге с размером клетки 1 × 1 изображена трапеция. Найдите её площадь.","answers":["35"],"points":1,"kind":"number","explanation":"Осно</string>
           </Properties>
         </Item>
-        <Item class="StringValue" referent="41">
+        <Item class="StringValue" referent="42">
           <Properties>
             <string name="Name">04</string>
             <string name="Value"><![CDATA[вания равны 4 и 10, высота 5. Площадь равна (4 + 10) : 2 · 5 = 35.","figure":{"w":420,"h":260,"items":[["line",30.0,235.0,30.0,25.0,0],["line",60.0,235.0,60.0,25.0,0],["line",90.0,235.0,90.0,25.0,0],["line",120.0,235.0,120.0,25.0,0],["line",150.0,235.0,150.0,25.0,0],["line",180.0,235.0,180.0,25.0,0],["line",210.0,235.0,210.0,25.0,0],["line",240.0,235.0,240.0,25.0,0],["line",270.0,235.0,270.0,25.0,0],["line",300.0,235.0,300.0,25.0,0],["line",330.0,235.0,330.0,25.0,0],["line",360.0,235.0,360.0,25.0,0],["line",390.0,235.0,390.0,25.0,0],["line",30.0,235.0,390.0,235.0,0],["line",30.0,205.0,390.0,205.0,0],["line",30.0,175.0,390.0,175.0,0],["line",30.0,145.0,390.0,145.0,0],["line",30.0,115.0,390.0,115.0,0],["line",30.0,85.0,390.0,85.0,0],["line",30.0,55.0,390.0,55.0,0],["line",30.0,25.0,390.0,25.0,0],["line",60.0,175.0,180.0,175.0,2],["line",180.0,175.0,330.0,25.0,2],["line",330.0,25.0,30.0,25.0,2],["line",30.0,25.0,60.0,175.0,2]]}},
@@ -3994,11 +4113,11 @@ return World
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="42">
+      <Item class="Folder" referent="43">
         <Properties>
           <string name="Name">math_prof</string>
         </Properties>
-        <Item class="StringValue" referent="43">
+        <Item class="StringValue" referent="44">
           <Properties>
             <string name="Name">01</string>
             <string name="Value">{"subject": "math_prof", "tasks": [
@@ -4239,7 +4358,7 @@ return World
 {"id":"math_prof-235","group":"fig_linear_graph","text":"На рисунке изображён график функции y = kx + b. Найдите k.","answers":["3"],"points":1,"kind":"number","explanation":"При увеличении x на 1</string>
           </Properties>
         </Item>
-        <Item class="StringValue" referent="44">
+        <Item class="StringValue" referent="45">
           <Properties>
             <string name="Name">02</string>
             <string name="Value"><![CDATA[ значение y меняется на 3, значит k = 3.","figure":{"w":420,"h":260,"items":[["line",100.0,251.0,100.0,9.0,0],["line",89.0,240.0,331.0,240.0,0],["line",122.0,251.0,122.0,9.0,0],["line",89.0,218.0,331.0,218.0,0],["line",144.0,251.0,144.0,9.0,0],["line",89.0,196.0,331.0,196.0,0],["line",166.0,251.0,166.0,9.0,0],["line",89.0,174.0,331.0,174.0,0],["line",188.0,251.0,188.0,9.0,0],["line",89.0,152.0,331.0,152.0,0],["line",210.0,251.0,210.0,9.0,0],["line",89.0,130.0,331.0,130.0,0],["line",232.0,251.0,232.0,9.0,0],["line",89.0,108.0,331.0,108.0,0],["line",254.0,251.0,254.0,9.0,0],["line",89.0,86.0,331.0,86.0,0],["line",276.0,251.0,276.0,9.0,0],["line",89.0,64.0,331.0,64.0,0],["line",298.0,251.0,298.0,9.0,0],["line",89.0,42.0,331.0,42.0,0],["line",320.0,251.0,320.0,9.0,0],["line",89.0,20.0,331.0,20.0,0],["line",84.6,130.0,335.4,130.0,1],["line",210.0,255.4,210.0,4.6,1],["text",328.8,143.2,"x","c"],["text",221.0,13.4,"y","c"],["text",201.2,141.0,"0","c"],["text",232.0,141.0,"1","c"],["text",201.2,108.0,"1","c"],["line",191.7,251.0,272.3,9.0,2],["circle",210.0,196.0,4.0,2],["circle",232.0,130.0,4.0,2]]}},
@@ -4294,7 +4413,7 @@ return World
 {"id":"math_prof-284","group":"fig_grid_trapezoid","text":"На клетчатой бумаге с размером клетки 1 × 1 изображена трапеция. Найдите её площадь.","answers":["15"],"points":1,"kind":"number","explanation":"Основания равны 2 и 4, высота 5. Площадь равна (2 + 4) : 2 · 5 = 15.","figure":{"w":420,"h":260,"items":[["line",30.0,235.0,30.0,25.0,0],["line",60.0,235.0,60.0,25.0,0],["line",90.0,235.0,90.0,25.0,0],["line",120.0,235.0,120.0,25.0,0],["line",150.0,235.0,150.0,25.0,0],["line",180.0,235.0,180.0,25.0,0],[]]></string>
           </Properties>
         </Item>
-        <Item class="StringValue" referent="45">
+        <Item class="StringValue" referent="46">
           <Properties>
             <string name="Name">03</string>
             <string name="Value">"line",210.0,235.0,210.0,25.0,0],["line",240.0,235.0,240.0,25.0,0],["line",270.0,235.0,270.0,25.0,0],["line",300.0,235.0,300.0,25.0,0],["line",330.0,235.0,330.0,25.0,0],["line",360.0,235.0,360.0,25.0,0],["line",390.0,235.0,390.0,25.0,0],["line",30.0,235.0,390.0,235.0,0],["line",30.0,205.0,390.0,205.0,0],["line",30.0,175.0,390.0,175.0,0],["line",30.0,145.0,390.0,145.0,0],["line",30.0,115.0,390.0,115.0,0],["line",30.0,85.0,390.0,85.0,0],["line",30.0,55.0,390.0,55.0,0],["line",30.0,25.0,390.0,25.0,0],["line",90.0,235.0,150.0,235.0,2],["line",150.0,235.0,360.0,85.0,2],["line",360.0,85.0,240.0,85.0,2],["line",240.0,85.0,90.0,235.0,2]]}},
@@ -4344,7 +4463,7 @@ return World
 {"id":"math_prof-328","group":"fig_vector","text":"На клетчатой бумаге с размером клетки 1 × 1 изображён вектор. Найдите его длину.","answers":["15"],"points":1,"kind":"number","explanation":"Вектор смещается на 12 клеток по горизонтали и на 9 по вертикали. По теореме Пифагора длина равна 15.","figure":{"w":420,"h":260,"items":[["line",10.0,250.0,10.0,10.0,0],["line",30.0,250.0,30.0,10.0,0],["line",50.0,250.0,50.0,10.0,0],["line",70.0,250.0,70.0,10.0,0],["line",90.0,250.0,90.0,10.0,0],["line",110.0,250.0,110.0,10.0,0],["line",130.0,250.0,130.0,10.0,0],["line",150.0,250.0,150.0,10.0,0],["line",170.0,250.0,170.0,10.0,0],["line",190.0,250.0,190.0,10.0,0],["line",210.0,250.0,210.0,10.0,0],["line",230.0,250.0,230.0,10.0,0],["line",250.0,250.0,250.0,10.0,0],["line",270.0,250.0,270.0,10.0,0],["line",290.0,250.0,290.0,10.0,0],["line",310.0,250.0,310.0,10.0,0],["line",330.0,250.0,330.0,10.0,0],["line",350.0,250.0,350.0,10.0,0],["line",370.0,250.0,370.0,10.0,0],["line",390.0,250.0,390.0,10.0,0],["line",410.0,250.0,410.0,10.0,0],["line",10.0,250.0,410.0,250.0,0],["line",10.0,230.0,410.0,230.0,0],["line",10.0,210.0,410.0,210.0,0],["line",10.0,190.0,410.0,190.0,0],["line",10.0,170.0,410.0,170.0,0],["line",10.0,150.0,410.0,150.0,0],["line",10.0,130.0,410.0,</string>
           </Properties>
         </Item>
-        <Item class="StringValue" referent="46">
+        <Item class="StringValue" referent="47">
           <Properties>
             <string name="Name">04</string>
             <string name="Value"><![CDATA[130.0,0],["line",10.0,110.0,410.0,110.0,0],["line",10.0,90.0,410.0,90.0,0],["line",10.0,70.0,410.0,70.0,0],["line",10.0,50.0,410.0,50.0,0],["line",10.0,30.0,410.0,30.0,0],["line",10.0,10.0,410.0,10.0,0],["line",270.0,230.0,30.0,50.0,2],["line",30.0,50.0,40.9,51.1,2],["line",30.0,50.0,34.1,60.2,2]]}},
@@ -4367,11 +4486,11 @@ return World
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="47">
+      <Item class="Folder" referent="48">
         <Properties>
           <string name="Name">physics</string>
         </Properties>
-        <Item class="StringValue" referent="48">
+        <Item class="StringValue" referent="49">
           <Properties>
             <string name="Name">01</string>
             <string name="Value">{"subject": "physics", "tasks": [
@@ -4597,7 +4716,7 @@ return World
 {"id":"physics-220","group":"ph_free_fall","text":"Камень свободно падает без начальной скорости. Какой буде</string>
           </Properties>
         </Item>
-        <Item class="StringValue" referent="49">
+        <Item class="StringValue" referent="50">
           <Properties>
             <string name="Name">02</string>
             <string name="Value">т его скорость через 9 с после начала падения? Ускорение свободного падения считайте равным 10 м/с², сопротивлением воздуха пренебрегите. Ответ дайте в м/с.","answers":["90"],"points":1,"kind":"number","explanation":"v = g · t = 10 · 9 = 90 м/с."},
@@ -4697,7 +4816,7 @@ return World
 {"id":"physics-314","group":"fig_xt_graph","text":"На рисунке показан график зависимости координаты тела от времени. Найдите модуль скорости тела в интервале от 0 до 2 с. Ответ дайте в м/с</string>
           </Properties>
         </Item>
-        <Item class="StringValue" referent="50">
+        <Item class="StringValue" referent="51">
           <Properties>
             <string name="Name">03</string>
             <string name="Value">.","answers":["8"],"points":1,"kind":"number","explanation":"v = Δx : Δt = 16 : 2 = 8 м/с.","figure":{"w":420,"h":260,"items":[["line",50.0,225.0,50.0,25.0,0],["line",92.0,225.0,92.0,25.0,0],["text",92.0,238.0,"1","c"],["line",134.0,225.0,134.0,25.0,0],["text",134.0,238.0,"2","c"],["line",176.0,225.0,176.0,25.0,0],["text",176.0,238.0,"3","c"],["line",218.0,225.0,218.0,25.0,0],["text",218.0,238.0,"4","c"],["line",260.0,225.0,260.0,25.0,0],["text",260.0,238.0,"5","c"],["line",302.0,225.0,302.0,25.0,0],["text",302.0,238.0,"6","c"],["line",344.0,225.0,344.0,25.0,0],["text",344.0,238.0,"7","c"],["line",386.0,225.0,386.0,25.0,0],["text",386.0,238.0,"8","c"],["line",50.0,225.0,386.0,225.0,0],["line",50.0,215.0,386.0,215.0,0],["line",50.0,205.0,386.0,205.0,0],["line",50.0,195.0,386.0,195.0,0],["line",50.0,185.0,386.0,185.0,0],["text",42.0,185.0,"4","r"],["line",50.0,175.0,386.0,175.0,0],["line",50.0,165.0,386.0,165.0,0],["line",50.0,155.0,386.0,155.0,0],["line",50.0,145.0,386.0,145.0,0],["text",42.0,145.0,"8","r"],["line",50.0,135.0,386.0,135.0,0],["line",50.0,125.0,386.0,125.0,0],["line",50.0,115.0,386.0,115.0,0],["line",50.0,105.0,386.0,105.0,0],["text",42.0,105.0,"12","r"],["line",50.0,95.0,386.0,95.0,0],["line",50.0,85.0,386.0,85.0,0],["line",50.0,75.0,386.0,75.0,0],["line",50.0,65.0,386.0,65.0,0],["text",42.0,65.0,"16","r"],["line",50.0,55.0,386.0,55.0,0],["line",50.0,45.0,386.0,45.0,0],["line",50.0,35.0,386.0,35.0,0],["line",50.0,25.0,386.0,25.0,0],["text",42.0,25.0,"20","r"],["line",50.0,225.0,402.8,225.0,1],["line",50.0,225.0,50.0,21.0,1],["text",42.0,238.0,"0","r"],["text",58.0,15.0,"x, м","l"],["text",412.0,212.0,"t, с","r"],["line",50.0,65.0,134.0,225.0,2],["line",134.0,225.0,386.0,25.0,2]]}},
@@ -4748,7 +4867,7 @@ return World
 {"id":"physics-359","group":"fig_circuit_parallel","text":"На рисунке показан участок цепи из двух параллельно соединённых резисторов. Найдите общее сопротивление участка. Ответ дайте в омах.","answers":["2"],"points":1,"kind":"number","explanation":"R = R₁ · R₂ : (R₁ + R₂) = 4 · 4 : 8 = 2 Ом.","figure":{"w":420,"h":260,"items":[["line",40.0,120.0,110.0,120.0,1],["line",310.0,120.0,380.0,120.0,1],["line",110.0,70.0,110.0,170.0,1],["line",310.0,70.0,310.0,170.0,1],["line",110.0,70.0,175.0,70.0,1],["line",245.0,70.0,310.0,70.0,1],["line",175.0,58.0,245.0,58.0,1],["line",245.0,58.0,245.0,82.0,1],["line",245.0,82.0,175.0,82.0,1],["line",175.0,82.0,175.0,58.0,1],["text",210.0,44.0,"R₁ = 4 Ом","c"],["line",110.0,170.0,175.0,170.0,1],["line",245.0,170.0,310.0,170.0,1],["line",175.0,158.0,245.0,158.0,1],["line",245.0,158.0,245.0,182.0,1],["line",245.0,182.0,175.0,182.0,1],["line",175.0,182.0,175.0,158.0,1],["text",210.0,144.0,"R₂ = 4 Ом","c"],["circle",110.0,120.0,4.0</string>
           </Properties>
         </Item>
-        <Item class="StringValue" referent="51">
+        <Item class="StringValue" referent="52">
           <Properties>
             <string name="Name">04</string>
             <string name="Value">,2],["circle",310.0,120.0,4.0,2],["circle",40.0,120.0,4.0,1],["circle",380.0,120.0,4.0,1]]}},
@@ -4801,7 +4920,7 @@ return World
 {"id":"physics-406","group":"fig_iu_graph","text":"На рисунке показан график зависимости силы тока в резисторе от напряжения на нём. Найдите сопротивление резистора. Ответ дайте в омах.","answers":["4"],"points":1,"kind":"number","explanation":"В отмеченной точке U = 8 В, I = 2 А; R = U : I = 4 Ом.","figure":{"w":420,"h":260,"items":[["line",54.0,225.0,54.0,45.0,0],["line",96.0,225.0,96.0,45.0,0],["text",96.0,238.0,"2","c"],["line",138.0,225.0,138.0,45.0,0],["text",138.0,238.0,"4","c"],["line",180.0,225.0,180.0,45.0,0],["text",180.0,238.0,"6","c"],["line",222.0,225.0,222.0,45.0,0],["text",222.0,238.0,"8","c"],["line",264.0,225.0,264.0,45.0,0],["text",264.0,238.0,"10","c"],["line",306.0,225.0,306.0,45.0,0],["text",306.0,238.0,"12","c"],["line",348.0,225.0,348.0,45.0,0],["text",348.0,238.0,"14","c"],["line",390.0,225.0,390.0,45.0,0],["text",390.0,238.0,"16","c"],["line",54.0,225</string>
           </Properties>
         </Item>
-        <Item class="StringValue" referent="52">
+        <Item class="StringValue" referent="53">
           <Properties>
             <string name="Name">05</string>
             <string name="Value"><![CDATA[.0,390.0,225.0,0],["line",54.0,207.0,390.0,207.0,0],["line",54.0,189.0,390.0,189.0,0],["text",46.0,189.0,"1","r"],["line",54.0,171.0,390.0,171.0,0],["line",54.0,153.0,390.0,153.0,0],["text",46.0,153.0,"2","r"],["line",54.0,135.0,390.0,135.0,0],["line",54.0,117.0,390.0,117.0,0],["text",46.0,117.0,"3","r"],["line",54.0,99.0,390.0,99.0,0],["line",54.0,81.0,390.0,81.0,0],["text",46.0,81.0,"4","r"],["line",54.0,63.0,390.0,63.0,0],["line",54.0,45.0,390.0,45.0,0],["text",46.0,45.0,"5","r"],["line",54.0,225.0,406.8,225.0,1],["line",54.0,225.0,54.0,37.8,1],["text",46.0,238.0,"0","r"],["text",62.0,35.0,"I, А","l"],["text",414.0,212.0,"U, В","r"],["line",54.0,225.0,390.0,81.0,2],["circle",222.0,153.0,4.0,2]]}},
@@ -4818,11 +4937,11 @@ return World
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="53">
+      <Item class="Folder" referent="54">
         <Properties>
           <string name="Name">russian</string>
         </Properties>
-        <Item class="StringValue" referent="54">
+        <Item class="StringValue" referent="55">
           <Properties>
             <string name="Name">01</string>
             <string name="Value"><![CDATA[{"subject": "russian", "tasks": [
@@ -4987,11 +5106,11 @@ return World
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="55">
+      <Item class="Folder" referent="56">
         <Properties>
           <string name="Name">social</string>
         </Properties>
-        <Item class="StringValue" referent="56">
+        <Item class="StringValue" referent="57">
           <Properties>
             <string name="Name">01</string>
             <string name="Value">{"subject": "social", "tasks": [
@@ -5121,7 +5240,7 @@ return World
 {"id":"social-124","group":"fig_market","text":"На рисунке показано изменение на рынке игрушек: линия спроса переместилась из положения D в положение D₁ (P цена товара, Q количество товара). Что могло вызвать такое изменение? Запишите номер ответа.\n1) рост затрат на оплату труда\n2) уменьшение числа покупателей\n3) ожидание покупателями роста цен\n4) уход части фирм с рынка","answers":["2"],"points":1,"kind":"exact","explanation":"Сдвиг линии влево означает уменьшение спроса. Подходит причина: уменьшение числа покупателей.","figure":{"w":420,"h":260,"items":[["line",60.0,20.0,60.0,230.0,1],["line",60.0,230.0,400.0,230.0,1],["text",44.0,26.0,"P","c"],["text",392.0,246.0,"Q","c"],["line",170.0,50.0,340.0,210.0,1],["line",100.0,</string>
           </Properties>
         </Item>
-        <Item class="StringValue" referent="57">
+        <Item class="StringValue" referent="58">
           <Properties>
             <string name="Name">02</string>
             <string name="Value"><![CDATA[50.0,270.0,210.0,2],["text",170.0,30.0,"D","c"],["text",100.0,30.0,"D₁","c"],["line",255.0,130.0,193.0,130.0,1],["line",193.0,130.0,200.7,125.4,1],["line",193.0,130.0,200.7,134.6,1]]}},
@@ -5146,19 +5265,19 @@ return World
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="58">
+  <Item class="StarterPlayer" referent="59">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="59">
+    <Item class="StarterPlayerScripts" referent="60">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="Folder" referent="60">
+      <Item class="Folder" referent="61">
         <Properties>
           <string name="Name">Client</string>
         </Properties>
-        <Item class="ModuleScript" referent="61">
+        <Item class="ModuleScript" referent="62">
           <Properties>
             <string name="Name">ExamScreen</string>
             <string name="Source"><![CDATA[-- Экран экзамена: задание с рисунком, поле ответа клетками как в бланке №1, навигатор, таймер, прогресс соперника.
@@ -5174,6 +5293,7 @@ local Settings = require(Shared.Settings)
 local Text = require(Shared.Text)
 local Ui = require(script.Parent.Ui)
 local Figure = require(script.Parent.Figure)
+local Reference = require(script.Parent.Reference)
 
 local ExamScreen = {}
 
@@ -5202,6 +5322,7 @@ function ExamScreen.create(parent: Instance, actions)
 	local lastBeepStage = 0
 	local settingText = false
 	local subjectName = ""
+	local subjectId = ""
 	local figureFrame: Frame? = nil
 
 	local frame = Ui.frame({ Name = "Exam", Size = UDim2.fromScale(1, 1), Visible = false, Parent = parent }, { Ui.corner(14) })
@@ -5377,13 +5498,21 @@ function ExamScreen.create(parent: Instance, actions)
 		Size = UDim2.fromOffset(240, 44),
 		Parent = frame,
 	})
+	-- Справочные материалы, которые выдают на экзамене по этому предмету. Кнопка видна, только если они есть.
+	local referenceButton = Ui.button("Справочные материалы", "rival", {
+		Name = "ReferenceButton",
+		Position = UDim2.new(0, 450, 1, -64),
+		Size = UDim2.fromOffset(236, 44),
+		Visible = false,
+		Parent = frame,
+	})
 	local hintLabel = Ui.label({
-		Text = "Enter или Tab: следующее задание\nPageUp и PageDown: листать",
-		TextSize = 13,
+		Text = "Enter или Tab: следующее\nPageUp, PageDown: листать",
+		TextSize = 12,
 		TextColor3 = C.muted,
 		TextXAlignment = Enum.TextXAlignment.Right,
-		Position = UDim2.new(1, -440, 1, -64),
-		Size = UDim2.fromOffset(420, 44),
+		Position = UDim2.new(1, -216, 1, -64),
+		Size = UDim2.fromOffset(196, 44),
 		Parent = frame,
 	})
 
@@ -5433,6 +5562,14 @@ function ExamScreen.create(parent: Instance, actions)
 		Size = UDim2.fromOffset(200, 50),
 		Parent = confirmCard,
 	})
+
+	local reference = Reference.create(frame)
+	referenceButton.Activated:Connect(function()
+		if not (submitted or timeUp) then
+			input:ReleaseFocus()
+			reference.open(subjectId)
+		end
+	end)
 
 	-- Заглушка после сдачи работы.
 	local doneCover = Ui.frame({
@@ -5572,6 +5709,7 @@ function ExamScreen.create(parent: Instance, actions)
 		input:ReleaseFocus()
 		input.TextEditable = false
 		confirmShade.Visible = false
+		reference.close()
 		doneText.Text = text
 		doneCover.Visible = true
 	end
@@ -5643,6 +5781,12 @@ function ExamScreen.create(parent: Instance, actions)
 			return
 		end
 		local key = inputObject.KeyCode
+		if reference.isOpen() then
+			if key == Enum.KeyCode.Escape then
+				reference.close()
+			end
+			return
+		end
 		if confirmShade.Visible then
 			if key == Enum.KeyCode.Escape then
 				confirmShade.Visible = false
@@ -5723,11 +5867,14 @@ function ExamScreen.create(parent: Instance, actions)
 		endsAt = state.endsAt
 		duration = state.endsAt - state.startedAt
 		subjectName = Subjects.nameOf(state.subject)
+		subjectId = state.subject
+		referenceButton.Visible = Reference.hasMaterials(subjectId)
+		reference.close()
 
 		rivalPill.Text = string.format("%s · %s", state.rival.name, Subjects.nameOf(state.rival.subject))
 		screen.setRival(state.rival)
 
-		hintLabel.Text = "Enter или Tab: следующее задание\nPageUp и PageDown: листать"
+		hintLabel.Text = "Enter или Tab: следующее\nPageUp, PageDown: листать"
 		input.TextEditable = true
 		confirmShade.Visible = false
 		doneCover.Visible = false
@@ -5738,6 +5885,12 @@ function ExamScreen.create(parent: Instance, actions)
 	function screen.hide()
 		frame.Visible = false
 		input:ReleaseFocus()
+		-- Скрытый экран не держит лишних объектов: рисунок и справочные материалы удаляются.
+		reference.close()
+		if figureFrame then
+			figureFrame:Destroy()
+			figureFrame = nil
+		end
 	end
 
 	RunService.Heartbeat:Connect(function()
@@ -5781,7 +5934,7 @@ return ExamScreen
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="62">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">Figure</string>
             <string name="Source"><![CDATA[-- Рисунок к заданию. Сервер присылает список простых фигур, клиент рисует их рамками и подписями:
@@ -5889,7 +6042,7 @@ return Figure
 ]]></string>
           </Properties>
         </Item>
-        <Item class="LocalScript" referent="63">
+        <Item class="LocalScript" referent="64">
           <Properties>
             <string name="Name">Main</string>
             <string name="Source"><![CDATA[-- Точка входа клиента: получает состояние парты с сервера и показывает нужный экран.
@@ -6146,7 +6299,7 @@ end)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="64">
+        <Item class="ModuleScript" referent="65">
           <Properties>
             <string name="Name">Perf</string>
             <string name="Source"><![CDATA[-- Диагностика производительности. Работает только при запуске в Studio: раз в 5 секунд пишет в Output
@@ -6189,7 +6342,466 @@ return Perf
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="65">
+        <Item class="ModuleScript" referent="66">
+          <Properties>
+            <string name="Name">Reference</string>
+            <string name="Source"><![CDATA[-- Справочные материалы, которые выдают на экзамене: таблица Менделеева и ряд активности металлов
+-- для химии, справочные данные для физики, формулы для математики, калькулятор там, где он разрешён.
+-- Вкладки строятся только при открытии и удаляются при закрытии, чтобы не держать лишние объекты.
+local Ui = require(script.Parent.Ui)
+local Calculator = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared").Calculator)
+
+local Reference = {}
+
+local C = Ui.colors
+
+-- Символ и относительная атомная масса, округлённая как в школьной таблице. Индекс равен порядковому номеру.
+local ELEMENTS = {
+	{ "H", "1" }, { "He", "4" }, { "Li", "7" }, { "Be", "9" }, { "B", "11" }, { "C", "12" }, { "N", "14" },
+	{ "O", "16" }, { "F", "19" }, { "Ne", "20" }, { "Na", "23" }, { "Mg", "24" }, { "Al", "27" }, { "Si", "28" },
+	{ "P", "31" }, { "S", "32" }, { "Cl", "35,5" }, { "Ar", "40" }, { "K", "39" }, { "Ca", "40" }, { "Sc", "45" },
+	{ "Ti", "48" }, { "V", "51" }, { "Cr", "52" }, { "Mn", "55" }, { "Fe", "56" }, { "Co", "59" }, { "Ni", "59" },
+	{ "Cu", "64" }, { "Zn", "65" }, { "Ga", "70" }, { "Ge", "73" }, { "As", "75" }, { "Se", "79" }, { "Br", "80" },
+	{ "Kr", "84" }, { "Rb", "85" }, { "Sr", "88" }, { "Y", "89" }, { "Zr", "91" }, { "Nb", "93" }, { "Mo", "96" },
+	{ "Tc", "98" }, { "Ru", "101" }, { "Rh", "103" }, { "Pd", "106" }, { "Ag", "108" }, { "Cd", "112" },
+	{ "In", "115" }, { "Sn", "119" }, { "Sb", "122" }, { "Te", "128" }, { "I", "127" }, { "Xe", "131" },
+	{ "Cs", "133" }, { "Ba", "137" }, { "La", "139" }, { "Ce", "140" }, { "Pr", "141" }, { "Nd", "144" },
+	{ "Pm", "145" }, { "Sm", "150" }, { "Eu", "152" }, { "Gd", "157" }, { "Tb", "159" }, { "Dy", "163" },
+	{ "Ho", "165" }, { "Er", "167" }, { "Tm", "169" }, { "Yb", "173" }, { "Lu", "175" }, { "Hf", "178" },
+	{ "Ta", "181" }, { "W", "184" }, { "Re", "186" }, { "Os", "190" }, { "Ir", "192" }, { "Pt", "195" },
+	{ "Au", "197" }, { "Hg", "201" }, { "Tl", "204" }, { "Pb", "207" }, { "Bi", "209" }, { "Po", "209" },
+	{ "At", "210" }, { "Rn", "222" }, { "Fr", "223" }, { "Ra", "226" }, { "Ac", "227" }, { "Th", "232" },
+	{ "Pa", "231" }, { "U", "238" }, { "Np", "237" }, { "Pu", "244" }, { "Am", "243" }, { "Cm", "247" },
+	{ "Bk", "247" }, { "Cf", "251" }, { "Es", "252" }, { "Fm", "257" }, { "Md", "258" }, { "No", "259" },
+	{ "Lr", "262" }, { "Rf", "267" }, { "Db", "268" }, { "Sg", "269" }, { "Bh", "270" }, { "Hs", "277" },
+	{ "Mt", "278" }, { "Ds", "281" }, { "Rg", "282" }, { "Cn", "285" }, { "Nh", "286" }, { "Fl", "289" },
+	{ "Mc", "290" }, { "Lv", "293" }, { "Ts", "294" }, { "Og", "294" },
+}
+
+-- Место элемента в длинной форме таблицы: строка (1-7 периоды, 8 лантаноиды, 9 актиноиды) и столбец (группа).
+local function placeOf(number: number): (number, number)
+	if number == 1 then
+		return 1, 1
+	elseif number == 2 then
+		return 1, 18
+	elseif number <= 10 then
+		return 2, if number <= 4 then number - 2 else number + 8
+	elseif number <= 18 then
+		return 3, if number <= 12 then number - 10 else number
+	elseif number <= 36 then
+		return 4, number - 18
+	elseif number <= 54 then
+		return 5, number - 36
+	elseif number <= 57 then
+		return 6, number - 54
+	elseif number <= 71 then
+		return 8, number - 54 -- лантаноиды: церий в 4-м столбце
+	elseif number <= 86 then
+		return 6, number - 68
+	elseif number <= 89 then
+		return 7, number - 86
+	elseif number <= 103 then
+		return 9, number - 86 -- актиноиды: торий в 4-м столбце
+	end
+	return 7, number - 100
+end
+
+local BLOCK_COLORS = {
+	s = Color3.fromRGB(251, 227, 237),
+	p = Color3.fromRGB(251, 239, 211),
+	d = Color3.fromRGB(221, 241, 242),
+	f = Color3.fromRGB(223, 243, 231),
+}
+
+local function blockOf(row: number, column: number, number: number): string
+	if row >= 8 then
+		return "f"
+	elseif column <= 2 or number == 2 then
+		return "s"
+	elseif column >= 13 then
+		return "p"
+	end
+	return "d"
+end
+
+local function buildPeriodicTable(parent: Instance)
+	local cellWidth, cellHeight = 47, 46
+	local left, top = 12, 8
+	for number, element in ELEMENTS do
+		local row, column = placeOf(number)
+		local y = top + (row - 1) * cellHeight + (if row >= 8 then 14 else 0)
+		local cell = Ui.frame({
+			Position = UDim2.fromOffset(left + (column - 1) * cellWidth, y),
+			Size = UDim2.fromOffset(cellWidth - 2, cellHeight - 2),
+			BackgroundColor3 = BLOCK_COLORS[blockOf(row, column, number)],
+			Parent = parent,
+		})
+		Ui.label({
+			Text = tostring(number),
+			TextSize = 10,
+			TextColor3 = C.muted,
+			TextWrapped = false,
+			Position = UDim2.fromOffset(3, 1),
+			Size = UDim2.fromOffset(30, 11),
+			Parent = cell,
+		})
+		Ui.label({
+			Text = element[1],
+			Font = Ui.fonts.bold,
+			TextSize = 17,
+			TextWrapped = false,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			Position = UDim2.fromOffset(0, 11),
+			Size = UDim2.new(1, 0, 0, 20),
+			Parent = cell,
+		})
+		Ui.label({
+			Text = element[2],
+			TextSize = 10,
+			TextWrapped = false,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			Position = UDim2.fromOffset(0, 31),
+			Size = UDim2.new(1, 0, 0, 12),
+			Parent = cell,
+		})
+	end
+	Ui.label({
+		Text = "В клетке: порядковый номер, символ, относительная атомная масса. Строки внизу: лантаноиды (58-71) и актиноиды (90-103). "
+			.. "Номер периода равен номеру строки, номер группы равен номеру столбца.",
+		TextSize = 13,
+		TextColor3 = C.muted,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		Position = UDim2.fromOffset(left, top + 9 * cellHeight + 22),
+		Size = UDim2.new(1, -24, 0, 40),
+		Parent = parent,
+	})
+end
+
+local function buildSheet(parent: Instance, text: string)
+	local scroll = Ui.new("ScrollingFrame", {
+		Position = UDim2.fromOffset(12, 8),
+		Size = UDim2.new(1, -24, 1, -16),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ScrollBarThickness = 6,
+		ScrollBarImageColor3 = C.muted,
+		CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ScrollingDirection = Enum.ScrollingDirection.Y,
+		Parent = parent,
+	})
+	Ui.label({
+		Text = text,
+		TextSize = 17,
+		LineHeight = 1.25,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		Size = UDim2.new(1, -14, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Parent = scroll,
+	})
+end
+
+local CALCULATOR_KEYS = {
+	{ "C", "←", "√", "÷" },
+	{ "7", "8", "9", "×" },
+	{ "4", "5", "6", "-" },
+	{ "1", "2", "3", "+" },
+	{ "±", "0", ",", "=" },
+}
+
+local function buildCalculator(parent: Instance)
+	local press = Calculator.new()
+	local holder = Ui.frame({
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 16),
+		Size = UDim2.fromOffset(368, 420),
+		BackgroundTransparency = 1,
+		Parent = parent,
+	})
+	local display = Ui.label({
+		Name = "Display",
+		Text = "0",
+		Font = Ui.fonts.mono,
+		TextSize = 34,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		TextWrapped = false,
+		BackgroundTransparency = 0,
+		BackgroundColor3 = C.sunken,
+		Size = UDim2.new(1, 0, 0, 64),
+		Parent = holder,
+	})
+	Ui.corner(8).Parent = display
+	Ui.new("UIPadding", { PaddingRight = UDim.new(0, 14), Parent = display })
+	for rowIndex, row in CALCULATOR_KEYS do
+		for columnIndex, key in row do
+			local isAction = not string.match(key, "^[%d,]$")
+			local button = Ui.button(key, if key == "=" then "primary" elseif isAction then "selected" else "plain", {
+				Name = "Key" .. key,
+				TextSize = 22,
+				Position = UDim2.fromOffset((columnIndex - 1) * 94, 76 + (rowIndex - 1) * 66),
+				Size = UDim2.fromOffset(86, 58),
+				Parent = holder,
+			})
+			button.Activated:Connect(function()
+				display.Text = press(key)
+			end)
+		end
+	end
+	Ui.label({
+		Text = "Обычный непрограммируемый калькулятор, как разрешено на экзамене.",
+		TextSize = 13,
+		TextColor3 = C.muted,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 444),
+		Size = UDim2.fromOffset(600, 20),
+		Parent = parent,
+	})
+end
+
+local ACTIVITY_SERIES = [[Электрохимический ряд напряжений металлов
+
+Li   K   Ba   Ca   Na   Mg   Al   Mn   Zn   Cr   Fe   Co   Ni   Sn   Pb   (H₂)   Cu   Hg   Ag   Pt   Au
+
+Слева направо активность металлов уменьшается.
+
+Металлы, стоящие левее водорода, вытесняют водород из растворов кислот. Металлы правее водорода с растворами кислот без окислительных свойств не реагируют.
+
+Более активный металл вытесняет менее активный из раствора его соли. Самые активные металлы (от Li до Na) в растворе реагируют прежде всего с водой.]]
+
+local PHYSICS_SHEET = [[Десятичные приставки
+гига (Г) 10⁹     мега (М) 10⁶     кило (к) 10³     гекто (г) 10²
+деци (д) 10⁻¹     санти (с) 10⁻²     милли (м) 10⁻³     микро (мк) 10⁻⁶     нано (н) 10⁻⁹     пико (п) 10⁻¹²
+
+Константы
+число π = 3,14
+ускорение свободного падения на Земле g = 10 м/с²
+гравитационная постоянная G = 6,7 · 10⁻¹¹ Н·м²/кг²
+универсальная газовая постоянная R = 8,31 Дж/(моль·К)
+постоянная Больцмана k = 1,38 · 10⁻²³ Дж/К
+постоянная Авогадро N = 6 · 10²³ моль⁻¹
+скорость света в вакууме c = 3 · 10⁸ м/с
+коэффициент в законе Кулона k = 9 · 10⁹ Н·м²/Кл²
+модуль заряда электрона e = 1,6 · 10⁻¹⁹ Кл
+постоянная Планка h = 6,6 · 10⁻³⁴ Дж·с
+
+Соотношения между единицами
+температура: 0 К = -273 °C
+атомная единица массы: 1 а. е. м. = 1,66 · 10⁻²⁷ кг
+1 электронвольт: 1 эВ = 1,6 · 10⁻¹⁹ Дж
+
+Массы частиц
+электрон 9,1 · 10⁻³¹ кг     протон 1,673 · 10⁻²⁷ кг     нейтрон 1,675 · 10⁻²⁷ кг
+
+Плотность, кг/м³
+вода 1000     древесина (сосна) 400     керосин 800     подсолнечное масло 900
+алюминий 2700     железо 7800     ртуть 13 600
+
+Удельная теплоёмкость, Дж/(кг·К)
+вода 4200     лёд 2100     железо 460     свинец 130     алюминий 900     медь 380     чугун 500
+
+Удельная теплота
+парообразования воды 2,3 · 10⁶ Дж/кг     плавления льда 3,3 · 10⁵ Дж/кг     плавления свинца 2,5 · 10⁴ Дж/кг
+
+Нормальные условия: давление 10⁵ Па, температура 0 °C
+
+Молярная масса, г/моль
+водород 2     гелий 4     литий 6     неон 20     азот 28     воздух 29     кислород 32     аргон 40
+вода 18     углекислый газ 44]]
+
+local MATH_PROFILE_SHEET = [[Справочные материалы
+
+sin²α + cos²α = 1
+
+sin 2α = 2 · sin α · cos α
+
+cos 2α = cos²α - sin²α
+
+sin (α + β) = sin α · cos β + cos α · sin β
+
+cos (α + β) = cos α · cos β - sin α · sin β]]
+
+local MATH_BASE_SHEET = [[Формулы сокращённого умножения
+(a + b)² = a² + 2ab + b²     (a - b)² = a² - 2ab + b²     a² - b² = (a + b)(a - b)
+
+Степени (знак ^ означает возведение в степень)
+a^n · a^m = a^(n+m)     a^n : a^m = a^(n-m)     (a^n)^m = a^(n·m)     a^(-n) = 1 : a^n     a⁰ = 1
+
+Квадратный корень
+√(a · b) = √a · √b     √(a : b) = √a : √b     (√a)² = a
+
+Квадратное уравнение ax² + bx + c = 0
+D = b² - 4ac     x = (-b ± √D) : (2a)
+
+Прогрессии
+арифметическая: n-й член равен a₁ + d · (n - 1), сумма первых n членов равна (a₁ + aₙ) · n : 2
+геометрическая: n-й член равен b₁ · q^(n-1)
+
+Логарифмы
+log (b · c) = log b + log c     log (b : c) = log b - log c     log (b^n) = n · log b
+(основание логарифмов одинаковое)
+
+Вероятность
+P = m : n, где m это число благоприятных исходов, n это число всех исходов
+
+Таблица квадратов
+11² = 121   12² = 144   13² = 169   14² = 196   15² = 225   16² = 256   17² = 289   18² = 324   19² = 361
+20² = 400   21² = 441   22² = 484   23² = 529   24² = 576   25² = 625
+
+Площади
+треугольник: a · h : 2     прямоугольный треугольник: a · b : 2, c² = a² + b²
+прямоугольник: a · b     параллелограмм: a · h     трапеция: (a + b) : 2 · h
+круг: πr²     длина окружности: 2πr
+
+Объёмы и поверхности
+куб: a³     прямоугольный параллелепипед: a · b · c     цилиндр: πr²h     конус: πr²h : 3
+шар: 4πr³ : 3     площадь сферы: 4πr²
+
+Значения тригонометрических функций
+угол      0°     30°     45°     60°     90°
+sin       0      1/2     √2/2    √3/2    1
+cos       1      √3/2    √2/2    1/2     0
+tg        0      √3/3    1       √3      нет
+
+sin²α + cos²α = 1     tg α = sin α : cos α]]
+
+-- Какие вкладки есть у предмета. Если предмета здесь нет, справочных материалов на экзамене не дают.
+local TABS = {
+	chemistry = {
+		{ title = "Таблица Менделеева", build = buildPeriodicTable },
+		{ title = "Ряд активности металлов", build = function(parent)
+			buildSheet(parent, ACTIVITY_SERIES)
+		end },
+		{ title = "Калькулятор", build = buildCalculator },
+	},
+	physics = {
+		{ title = "Справочные данные", build = function(parent)
+			buildSheet(parent, PHYSICS_SHEET)
+		end },
+		{ title = "Калькулятор", build = buildCalculator },
+	},
+	math_base = {
+		{ title = "Формулы", build = function(parent)
+			buildSheet(parent, MATH_BASE_SHEET)
+		end },
+	},
+	math_prof = {
+		{ title = "Формулы", build = function(parent)
+			buildSheet(parent, MATH_PROFILE_SHEET)
+		end },
+	},
+	geography = {
+		{ title = "Калькулятор", build = buildCalculator },
+	},
+}
+
+function Reference.hasMaterials(subjectId: string): boolean
+	return TABS[subjectId] ~= nil
+end
+
+-- Создаёт окно справочных материалов поверх экрана экзамена. Возвращает { open(subjectId), close(), isOpen() }.
+function Reference.create(parent: Instance)
+	local panel = {}
+	local content: Frame? = nil
+	local tabButtons = {}
+
+	local frame = Ui.frame({
+		Name = "Reference",
+		Size = UDim2.fromScale(1, 1),
+		Active = true,
+		Visible = false,
+		ZIndex = 25,
+		Parent = parent,
+	}, { Ui.corner(14) })
+	local header = Ui.frame({ Size = UDim2.new(1, 0, 0, 56), BackgroundColor3 = C.sunken, Parent = frame }, { Ui.corner(14) })
+	Ui.label({
+		Text = "Справочные материалы",
+		Font = Ui.fonts.bold,
+		TextSize = 18,
+		Position = UDim2.fromOffset(20, 0),
+		Size = UDim2.fromOffset(260, 56),
+		Parent = header,
+	})
+	local closeButton = Ui.button("Вернуться к заданию", "primary", {
+		Name = "Close",
+		Position = UDim2.new(1, -236, 0, 9),
+		Size = UDim2.fromOffset(220, 38),
+		Parent = header,
+	})
+	local tabRow = Ui.frame({
+		Position = UDim2.fromOffset(20, 64),
+		Size = UDim2.new(1, -40, 0, 36),
+		BackgroundTransparency = 1,
+		Parent = frame,
+	})
+	local body = Ui.frame({
+		Name = "Body",
+		Position = UDim2.fromOffset(20, 106),
+		Size = UDim2.new(1, -40, 1, -122),
+		BackgroundTransparency = 1,
+		Parent = frame,
+	})
+
+	local function clear()
+		if content then
+			content:Destroy()
+			content = nil
+		end
+	end
+
+	local function showTab(tabs, index: number)
+		clear()
+		content = Ui.frame({ Name = "Content", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Parent = body })
+		tabs[index].build(content)
+		for buttonIndex, button in tabButtons do
+			Ui.styleButton(button, if buttonIndex == index then "selected" else "plain")
+		end
+	end
+
+	function panel.open(subjectId: string)
+		local tabs = TABS[subjectId]
+		if not tabs then
+			return
+		end
+		for _, button in tabButtons do
+			button:Destroy()
+		end
+		tabButtons = {}
+		for index, tab in tabs do
+			local button = Ui.button(tab.title, "plain", {
+				Name = "Tab" .. index,
+				TextSize = 15,
+				Position = UDim2.fromOffset((index - 1) * 250, 0),
+				Size = UDim2.fromOffset(240, 36),
+				Parent = tabRow,
+			})
+			button.Activated:Connect(function()
+				showTab(tabs, index)
+			end)
+			tabButtons[index] = button
+		end
+		showTab(tabs, 1)
+		frame.Visible = true
+	end
+
+	function panel.close()
+		frame.Visible = false
+		clear()
+	end
+
+	function panel.isOpen(): boolean
+		return frame.Visible
+	end
+
+	closeButton.Activated:Connect(panel.close)
+	return panel
+end
+
+return Reference
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="67">
           <Properties>
             <string name="Name">ResultsScreen</string>
             <string name="Source"><![CDATA[-- Экран итогов: исход, баллы и число верных ответов у обоих, разбор своей работы, реванш.
@@ -6459,7 +7071,7 @@ function ResultsScreen.create(parent: Instance, actions)
 			rematchButton.Text = "Принять реванш"
 			Ui.styleButton(rematchButton, "primary")
 		else
-			rematchNote.Text = "Те же предметы и настройки, новый вариант."
+			rematchNote.Text = "Перед реваншем можно сменить предмет и настройки."
 			rematchButton.Text = "Реванш"
 			Ui.styleButton(rematchButton, "primary")
 		end
@@ -6495,6 +7107,14 @@ function ResultsScreen.create(parent: Instance, actions)
 	end
 
 	function screen.hide()
+		if frame.Visible then
+			-- Разбор может содержать сотни объектов (строки и рисунки), скрытым он не нужен.
+			for _, child in list:GetChildren() do
+				if child:IsA("Frame") then
+					child:Destroy()
+				end
+			end
+		end
 		frame.Visible = false
 	end
 
@@ -6505,7 +7125,7 @@ return ResultsScreen
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="66">
+        <Item class="ModuleScript" referent="68">
           <Properties>
             <string name="Name">SetupScreen</string>
             <string name="Source"><![CDATA[-- Экран настройки матча: свой предмет, выбор соперника, голосование за время и число заданий.
@@ -6732,7 +7352,7 @@ return SetupScreen
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="67">
+        <Item class="ModuleScript" referent="69">
           <Properties>
             <string name="Name">Ui</string>
             <string name="Source"><![CDATA[-- Общие цвета и заготовки элементов интерфейса.

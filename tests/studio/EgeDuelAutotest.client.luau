@@ -176,6 +176,10 @@ local function checkClassroom()
 
 	local shelf = classroom:FindFirstChild("Bookshelf")
 	local back = shelf and shelf:FindFirstChild("Back")
+	check("подсказка у книжной полки рисуется поверх стены", back and back.Bubble.AlwaysOnTop)
+	local door, doorFrame = classroom:FindFirstChild("Door"), classroom:FindFirstChild("DoorFrame")
+	check("дверь выступает из стены и рамы", door and doorFrame
+		and door.Position.Z - door.Size.Z / 2 < doorFrame.Position.Z - doorFrame.Size.Z / 2 - 0.1)
 	pressAndWait("книжная полка показывает факт", back, function()
 		return back.Bubble.Enabled
 	end)
@@ -221,6 +225,57 @@ local function checkFigureModule(gui: Instance)
 	holder:Destroy()
 end
 
+-- Справочные материалы: окно строится напрямую, как при нажатии кнопки на экзамене.
+local function checkReference(gui: Instance)
+	local module = player.PlayerScripts:FindFirstChild("Reference", true)
+	check("модуль справочных материалов найден", module ~= nil)
+	if not module then
+		return
+	end
+	local Reference = require(module)
+	local holder = Instance.new("Frame")
+	holder.Size = UDim2.fromOffset(920, 620)
+	holder.Visible = false
+	holder.Parent = gui
+	local panel = Reference.create(holder)
+	local body = holder.Reference.Body
+
+	check("справочные материалы есть у химии, физики, математики и географии", Reference.hasMaterials("chemistry")
+		and Reference.hasMaterials("physics") and Reference.hasMaterials("math_base")
+		and Reference.hasMaterials("math_prof") and Reference.hasMaterials("geography"))
+	check("у русского языка справочных материалов нет", not Reference.hasMaterials("russian"))
+
+	panel.open("chemistry")
+	local cells, places, symbols = 0, {}, {}
+	local overlap = false
+	for _, cell in body.Content:GetChildren() do
+		if cell:IsA("Frame") then
+			cells += 1
+			local key = cell.Position.X.Offset .. ":" .. cell.Position.Y.Offset
+			overlap = overlap or places[key] ~= nil
+			places[key] = true
+			for _, label in cell:GetChildren() do
+				symbols[label.Text] = true
+			end
+		end
+	end
+	check("таблица Менделеева: 118 клеток, клеток: " .. cells, cells == 118)
+	check("таблица Менделеева: клетки не накладываются", not overlap)
+	check("таблица Менделеева: есть H, Fe, Cl с массой 35,5 и Og", symbols["H"] and symbols["Fe"] and symbols["35,5"] and symbols["Og"])
+	check("у химии три вкладки", holder.Reference:FindFirstChild("Tab3", true) ~= nil)
+
+	panel.open("physics")
+	check("физика: справочные данные показаны", findText(body, "постоянная Больцмана") ~= nil)
+	panel.open("math_prof")
+	check("математика, профиль: формулы показаны", findText(body, "sin 2α") ~= nil)
+	panel.open("geography")
+	local display = body:FindFirstChild("Display", true)
+	check("география: калькулятор показан", display ~= nil and body:FindFirstChild("Key=", true) ~= nil)
+	panel.close()
+	check("после закрытия содержимое удалено", body:FindFirstChild("Content") == nil)
+	holder:Destroy()
+end
+
 local function run()
 	local remotes = ReplicatedStorage:WaitForChild("Remotes", 20)
 	check("сервер создал Remotes", remotes ~= nil)
@@ -244,6 +299,8 @@ local function run()
 	checkClassroom()
 	mark("класс, осмотр предметов")
 	checkFigureModule(gui)
+	checkReference(gui)
+	mark("справочные материалы")
 
 	local action = remotes:WaitForChild("Action")
 	local setup = gui:FindFirstChild("Setup", true)
@@ -310,6 +367,7 @@ local function run()
 	check("таймер идёт", findText(exam, "^%d%d:%d%d$") ~= nil)
 	check("кнопка «Сдать работу» стоит в шапке", exam:FindFirstChild("Submit", true) and exam:FindFirstChild("Submit", true).Parent ~= exam)
 	check("окно подтверждения сдачи закрыто", exam:FindFirstChild("Confirm") and not exam.Confirm.Visible)
+	check("у математики есть кнопка справочных материалов", exam:FindFirstChild("ReferenceButton") and exam.ReferenceButton.Visible)
 	check("стрелки листания и кнопка «К заданию без ответа»", exam:FindFirstChild("Prev") and exam:FindFirstChild("Next") and exam:FindFirstChild("NextEmpty"))
 	check("в навигаторе 20 номеров", exam:FindFirstChild("Nav20") and exam.Nav20.Visible)
 	local taskText = exam:FindFirstChild("TaskText", true)
@@ -381,13 +439,22 @@ local function run()
 	hold(5)
 
 	action:FireServer("rematch")
+	waitFor("реванш: снова экран настройки, предмет можно сменить", function()
+		return setup.Visible
+	end, 5)
+	action:FireServer("setSubject", "chemistry")
+	task.wait(0.5)
+	action:FireServer("ready", true)
 	waitFor("реванш: отсчёт", function()
 		return countdown.Visible
 	end, 5)
+	check("реванш: выбран новый предмет", findText(countdown, "Химия") ~= nil)
 	waitFor("реванш: экзамен", function()
 		return exam.Visible
 	end, 10)
 	task.wait(1)
+	check("у химии есть кнопка справочных материалов", exam.ReferenceButton.Visible)
+	mark("реванш, экзамен")
 	action:FireServer("submit")
 	waitFor("реванш: итоги", function()
 		return results.Visible
@@ -414,6 +481,20 @@ local function showSamples()
 	if not panel or not module then
 		return
 	end
+	-- Справочные материалы: показываем каждую вкладку по очереди.
+	local referenceModule = player.PlayerScripts:FindFirstChild("Reference", true)
+	if referenceModule then
+		local reference = require(referenceModule).create(panel)
+		for _, subject in { "chemistry", "physics", "math_base", "geography" } do
+			reference.open(subject)
+			task.wait(3)
+		end
+		reference.close()
+	end
+	if ReplicatedStorage:FindFirstChild("EgeTestHold") and ReplicatedStorage.EgeTestHold.Value then
+		return -- короткий режим снимков: только справочные материалы
+	end
+
 	local tasks = ReplicatedStorage:WaitForChild("EgeTestSamples"):InvokeServer()
 	local noop = function() end
 	local preview = require(module).create(panel, { answer = noop, submit = noop })

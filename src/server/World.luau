@@ -133,11 +133,13 @@ local function newText(parent: Instance, text: string, size: UDim2, position: UD
 end
 
 -- Всплывающая подпись над предметом. Возвращает функцию показа текста на несколько секунд.
-local function newBubble(part: BasePart, height: number): (string) -> ()
+-- toward: сдвиг подписи в сторону комнаты, чтобы она не уходила в стену за предметом.
+local function newBubble(part: BasePart, height: number, toward: Vector3?): (string) -> ()
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "Bubble"
 	billboard.Size = UDim2.fromOffset(340, 96)
-	billboard.StudsOffset = Vector3.new(0, height, 0)
+	billboard.StudsOffsetWorldSpace = Vector3.new(0, height, 0) + (toward or Vector3.zero)
+	billboard.AlwaysOnTop = true
 	billboard.MaxDistance = 60
 	billboard.Enabled = false
 	billboard.Parent = part
@@ -298,8 +300,9 @@ local function buildRoom(parent: Instance)
 	end
 
 	-- Дверь на задней стене.
-	newPart(parent, "Door", Vector3.new(5, 9, 0.3), CFrame.new(0, 4.5, 31.85), COLORS.wood, Enum.Material.Wood)
-	newPart(parent, "DoorKnob", Vector3.new(0.5, 0.5, 0.5), CFrame.new(1.8, 4.4, 31.55), COLORS.brass, Enum.Material.Metal).Shape =
+	newPart(parent, "Door", Vector3.new(5, 9, 0.6), CFrame.new(0, 4.5, 31.6), COLORS.wood, Enum.Material.Wood)
+	newPart(parent, "DoorFrame", Vector3.new(5.8, 9.4, 0.4), CFrame.new(0, 4.7, 31.75), COLORS.trim)
+	newPart(parent, "DoorKnob", Vector3.new(0.5, 0.5, 0.5), CFrame.new(1.8, 4.4, 31.15), COLORS.brass, Enum.Material.Metal).Shape =
 		Enum.PartType.Ball
 
 	buildPlant(parent, -39, -29)
@@ -392,26 +395,37 @@ local function buildTeacherCorner(parent: Instance)
 		lands[index] = { part = land, offset = CFrame.new(spot[1]) }
 	end
 
-	local speed = 0.4
+	-- Глобус вращается только несколько секунд после толчка. В покое детали не двигаются,
+	-- и серверу нечего рассылать игрокам.
 	local angle = 0
 	local base = globe.CFrame
-	task.spawn(function()
-		while true do
-			local dt = task.wait(0.05)
-			angle += speed * dt
-			speed = math.max(0.4, speed - 3 * dt) -- после толчка глобус постепенно замедляется
-			local turned = base * CFrame.Angles(0, angle, 0)
-			globe.CFrame = turned
-			for _, land in lands do
-				land.part.CFrame = turned * land.offset
-			end
+	local spinning = false
+	local speed = 0
+	local function spin()
+		speed = 9
+		if spinning then
+			return
 		end
-	end)
+		spinning = true
+		task.spawn(function()
+			while speed > 0.2 do
+				local dt = task.wait(0.05)
+				angle += speed * dt
+				speed -= 2.2 * dt
+				local turned = base * CFrame.Angles(0, angle, 0)
+				globe.CFrame = turned
+				for _, land in lands do
+					land.part.CFrame = turned * land.offset
+				end
+			end
+			spinning = false
+		end)
+	end
 
 	local showFact = newBubble(globe, 3.5)
 	local nextFact = factCycle(GLOBE_FACTS)
 	newPrompt(globe, "Покрутить", "Глобус").Triggered:Connect(function()
-		speed = 9
+		spin()
 		showFact(nextFact())
 	end)
 
@@ -426,7 +440,7 @@ local function buildShelves(parent: Instance)
 	local nextFact = factCycle(BOOK_FACTS)
 	for _, x in { -35, 35 } do
 		local back = buildBookshelf(parent, x, 30.6)
-		local showFact = newBubble(back, 6)
+		local showFact = newBubble(back, 3, Vector3.new(0, 0, -3))
 		newPrompt(back, "Открыть книгу", "Книжная полка").Triggered:Connect(function()
 			showFact(nextFact())
 		end)
@@ -447,7 +461,7 @@ local function buildLights(parent: Instance, spots: { Vector3 })
 		table.insert(lamps, { shade = shade, light = light })
 	end
 
-	local switch = newPart(parent, "LightSwitch", Vector3.new(0.8, 1.2, 0.2), CFrame.new(5, 5.4, 31.9), COLORS.trim)
+	local switch = newPart(parent, "LightSwitch", Vector3.new(0.8, 1.2, 0.2), CFrame.new(5, 6, 31.88), COLORS.trim)
 	local click = newSound(switch, "rbxasset://sounds/switch.wav", 0.6)
 	local on = true
 	local prompt = newPrompt(switch, "Выключить свет", "Выключатель")
@@ -487,7 +501,7 @@ local function buildLights(parent: Instance, spots: { Vector3 })
 	task.spawn(function()
 		while true do
 			time.Text = os.date("%H:%M")
-			task.wait(5)
+			task.wait(15)
 		end
 	end)
 end

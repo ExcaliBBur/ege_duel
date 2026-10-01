@@ -21,6 +21,7 @@ MODULES = [
     ("Settings", "src/shared/Settings.luau"),
     ("Subjects", "src/shared/Subjects.luau"),
     ("Scoring", "src/shared/Scoring.luau"),
+    ("Calculator", "src/shared/Calculator.luau"),
     ("Variant", "src/server/Variant.luau"),
     ("Config", "src/server/Config.luau"),
     ("RealBank", "src/server/Bank.luau"),

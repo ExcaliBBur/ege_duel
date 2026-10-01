@@ -69,29 +69,38 @@ local function run()
 	end
 	table.insert(lines, "деталей в классе: " .. parts)
 
-	-- Рывки: длинные паузы между кадрами видны при любом ограничении частоты кадров.
-	local gaps = {}
-	local connection = RunService.RenderStepped:Connect(function(dt)
-		table.insert(gaps, dt)
-	end)
-	task.wait(20)
-	connection:Disconnect()
-	table.sort(gaps)
-	local total = 0
-	for _, dt in gaps do
-		total += dt
+	measure("как есть")
+
+	-- Экран экзамена с заданием без рисунка и с рисунками разных видов.
+	local module = player.PlayerScripts:FindFirstChild("ExamScreen", true)
+	local panel = gui:FindFirstChild("Exam", true).Parent
+	local preview = require(module).create(panel, { answer = function() end, submit = function() end })
+	local samples = ReplicatedStorage:WaitForChild("EgeTestSamples"):InvokeServer()
+	local function show(sample)
+		local now = Workspace:GetServerTimeNow()
+		preview.show({
+			subject = "math_base", startedAt = now, endsAt = now + 900,
+			tasks = { sample, sample, sample },
+			rival = { name = "Образец", subject = "physics", answered = 1, total = 3, submitted = false, left = false },
+		})
 	end
-	local long = 0
-	for _, dt in gaps do
-		if dt > 0.15 then
-			long += 1
+	show({ text = "Задание без рисунка: найдите значение выражения 2 + 2.", points = 1 })
+	measure("экзамен, задание без рисунка")
+	for index, sample in samples do
+		if index <= 6 then
+			show(sample)
+			local items = if sample.figure then #sample.figure.items else 0
+			measure(string.format("экзамен, рисунок %d (%d фигур)", index, items))
 		end
 	end
-	table.insert(lines, string.format(
-		"РЫВКИ за 20 с: кадров %d, средний %.0f мс, медиана %.0f мс, 95%% %.0f мс, худший %.0f мс, кадров дольше 150 мс: %d",
-		#gaps, total / #gaps * 1000, gaps[math.ceil(#gaps / 2)] * 1000, gaps[math.ceil(#gaps * 0.95)] * 1000, gaps[#gaps] * 1000, long
-	))
-	measure("как есть")
+	preview.hide()
+	measure("экзамен скрыт, рисунок остался в памяти")
+	for _, item in gui:GetDescendants() do
+		if item.Name == "Figure" then
+			item:Destroy()
+		end
+	end
+	measure("рисунки удалены")
 
 	gui.Enabled = false
 	measure("без интерфейса игры")

@@ -265,7 +265,7 @@ function ResultsScreen.create(parent: Instance, actions)
 			rematchButton.Text = "Принять реванш"
 			Ui.styleButton(rematchButton, "primary")
 		else
-			rematchNote.Text = "Те же предметы и настройки, новый вариант."
+			rematchNote.Text = "Перед реваншем можно сменить предмет и настройки."
 			rematchButton.Text = "Реванш"
 			Ui.styleButton(rematchButton, "primary")
 		end
@@ -301,6 +301,14 @@ function ResultsScreen.create(parent: Instance, actions)
 	end
 
 	function screen.hide()
+		if frame.Visible then
+			-- Разбор может содержать сотни объектов (строки и рисунки), скрытым он не нужен.
+			for _, child in list:GetChildren() do
+				if child:IsA("Frame") then
+					child:Destroy()
+				end
+			end
+		end
 		frame.Visible = false
 	end
 

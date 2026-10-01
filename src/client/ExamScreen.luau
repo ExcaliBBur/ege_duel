@@ -11,6 +11,7 @@ local Settings = require(Shared.Settings)
 local Text = require(Shared.Text)
 local Ui = require(script.Parent.Ui)
 local Figure = require(script.Parent.Figure)
+local Reference = require(script.Parent.Reference)
 
 local ExamScreen = {}
 
@@ -39,6 +40,7 @@ function ExamScreen.create(parent: Instance, actions)
 	local lastBeepStage = 0
 	local settingText = false
 	local subjectName = ""
+	local subjectId = ""
 	local figureFrame: Frame? = nil
 
 	local frame = Ui.frame({ Name = "Exam", Size = UDim2.fromScale(1, 1), Visible = false, Parent = parent }, { Ui.corner(14) })
@@ -214,13 +216,21 @@ function ExamScreen.create(parent: Instance, actions)
 		Size = UDim2.fromOffset(240, 44),
 		Parent = frame,
 	})
+	-- Справочные материалы, которые выдают на экзамене по этому предмету. Кнопка видна, только если они есть.
+	local referenceButton = Ui.button("Справочные материалы", "rival", {
+		Name = "ReferenceButton",
+		Position = UDim2.new(0, 450, 1, -64),
+		Size = UDim2.fromOffset(236, 44),
+		Visible = false,
+		Parent = frame,
+	})
 	local hintLabel = Ui.label({
-		Text = "Enter или Tab: следующее задание\nPageUp и PageDown: листать",
-		TextSize = 13,
+		Text = "Enter или Tab: следующее\nPageUp, PageDown: листать",
+		TextSize = 12,
 		TextColor3 = C.muted,
 		TextXAlignment = Enum.TextXAlignment.Right,
-		Position = UDim2.new(1, -440, 1, -64),
-		Size = UDim2.fromOffset(420, 44),
+		Position = UDim2.new(1, -216, 1, -64),
+		Size = UDim2.fromOffset(196, 44),
 		Parent = frame,
 	})
 
@@ -270,6 +280,14 @@ function ExamScreen.create(parent: Instance, actions)
 		Size = UDim2.fromOffset(200, 50),
 		Parent = confirmCard,
 	})
+
+	local reference = Reference.create(frame)
+	referenceButton.Activated:Connect(function()
+		if not (submitted or timeUp) then
+			input:ReleaseFocus()
+			reference.open(subjectId)
+		end
+	end)
 
 	-- Заглушка после сдачи работы.
 	local doneCover = Ui.frame({
@@ -409,6 +427,7 @@ function ExamScreen.create(parent: Instance, actions)
 		input:ReleaseFocus()
 		input.TextEditable = false
 		confirmShade.Visible = false
+		reference.close()
 		doneText.Text = text
 		doneCover.Visible = true
 	end
@@ -480,6 +499,12 @@ function ExamScreen.create(parent: Instance, actions)
 			return
 		end
 		local key = inputObject.KeyCode
+		if reference.isOpen() then
+			if key == Enum.KeyCode.Escape then
+				reference.close()
+			end
+			return
+		end
 		if confirmShade.Visible then
 			if key == Enum.KeyCode.Escape then
 				confirmShade.Visible = false
@@ -560,11 +585,14 @@ function ExamScreen.create(parent: Instance, actions)
 		endsAt = state.endsAt
 		duration = state.endsAt - state.startedAt
 		subjectName = Subjects.nameOf(state.subject)
+		subjectId = state.subject
+		referenceButton.Visible = Reference.hasMaterials(subjectId)
+		reference.close()
 
 		rivalPill.Text = string.format("%s · %s", state.rival.name, Subjects.nameOf(state.rival.subject))
 		screen.setRival(state.rival)
 
-		hintLabel.Text = "Enter или Tab: следующее задание\nPageUp и PageDown: листать"
+		hintLabel.Text = "Enter или Tab: следующее\nPageUp, PageDown: листать"
 		input.TextEditable = true
 		confirmShade.Visible = false
 		doneCover.Visible = false
@@ -575,6 +603,12 @@ function ExamScreen.create(parent: Instance, actions)
 	function screen.hide()
 		frame.Visible = false
 		input:ReleaseFocus()
+		-- Скрытый экран не держит лишних объектов: рисунок и справочные материалы удаляются.
+		reference.close()
+		if figureFrame then
+			figureFrame:Destroy()
+			figureFrame = nil
+		end
 	end
 
 	RunService.Heartbeat:Connect(function()

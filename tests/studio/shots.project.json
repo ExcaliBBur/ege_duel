@@ -7,7 +7,10 @@
         "$path": "../../src/shared"
       },
       "EgeTestHold": {
-        "$className": "BoolValue"
+        "$className": "BoolValue",
+        "$properties": {
+          "Value": true
+        }
       }
     },
     "ServerScriptService": {

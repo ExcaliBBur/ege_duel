@@ -686,7 +686,9 @@ function handlers.rematch(tbl, slot)
 	end
 	slot.rematch = true
 	if rival.rematch then
-		startCountdown(tbl, tbl.settings)
+		-- Оба согласны: возвращаемся к настройке. Прошлые предметы и голоса остаются выбранными,
+		-- их можно поменять перед новым матчем.
+		enterSetup(tbl)
 		return
 	end
 	sendState(slot, {
