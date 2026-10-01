@@ -1,6 +1,7 @@
 -- Строит класс кодом при запуске сервера: комната, окна, доски, плакаты, мебель, парты
 -- и интерактивные предметы (глобус, книжные полки, выключатель, звонок, доска «Задача дня»).
 local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 
 local World = {}
@@ -290,6 +291,11 @@ local function buildRoom(parent: Instance)
 	for index, x in { -27, -16, 16, 27 } do
 		buildPoster(parent, Vector3.new(7.4, 4.6, 0.2), CFrame.new(x, 10.6, 31.85), Enum.NormalId.Front, POSTERS[index + 4])
 	end
+
+	-- Невидимый потолок: со шкафа или парты нельзя перепрыгнуть через стену.
+	local ceiling = newPart(parent, "Ceiling", Vector3.new(86, 1, 66), CFrame.new(0, 16.7, 0), COLORS.wall)
+	ceiling.Transparency = 1
+	ceiling.CastShadow = false
 
 	-- Балки под потолком: к ним подвешены лампы.
 	for _, z in { -10, 14 } do
@@ -652,6 +658,35 @@ local function buildTable(parent: Instance, id: number, center: Vector3)
 	}
 end
 
+-- Запасная защита: если персонаж всё же оказался за пределами класса, возвращаем его ко входу.
+local ROOM_HALF_X, ROOM_HALF_Z, ROOM_TOP, ROOM_BOTTOM = 43, 33, 18, -4
+local RETURN_POINT = CFrame.new(0, 4, 25)
+
+local function isOutside(position: Vector3): boolean
+	return math.abs(position.X) > ROOM_HALF_X
+		or math.abs(position.Z) > ROOM_HALF_Z
+		or position.Y > ROOM_TOP
+		or position.Y < ROOM_BOTTOM
+end
+
+World.isOutside = isOutside
+
+local function keepPlayersInside()
+	task.spawn(function()
+		while true do
+			task.wait(0.5)
+			for _, player in Players:GetPlayers() do
+				local character = player.Character
+				local root = character and character:FindFirstChild("HumanoidRootPart")
+				if root and root:IsA("BasePart") and isOutside(root.Position) then
+					root.AssemblyLinearVelocity = Vector3.zero
+					character:PivotTo(RETURN_POINT)
+				end
+			end
+		end
+	end)
+end
+
 local TABLE_COLUMNS = { -24, 0, 24 }
 local TABLE_ROWS = { -10, 14 }
 
@@ -687,6 +722,7 @@ function World.build(tableCount: number, options: { randomTask: (() -> any)? }?)
 		end
 	end
 	buildLights(classroom, lampSpots)
+	keepPlayersInside()
 
 	return {
 		tables = tables,

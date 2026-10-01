@@ -145,6 +145,21 @@ local function checkClassroom()
 	check("подвесные лампы", countNamed(classroom, "Lamp") == 6)
 	check("настольные лампы на партах", countNamed(classroom, "DeskLampShade") == 6)
 
+	local ceiling = classroom:FindFirstChild("Ceiling")
+	check("над классом невидимый потолок", ceiling and ceiling.CanCollide and ceiling.Transparency == 1)
+	local function rootPosition(): Vector3
+		return player.Character.HumanoidRootPart.Position
+	end
+	local function inside(): boolean
+		local position = rootPosition()
+		return math.abs(position.X) < 42 and math.abs(position.Z) < 32 and position.Y > 0 and position.Y < 16
+	end
+	for name, point in { ["за стеной"] = Vector3.new(60, 5, 0), ["над классом"] = Vector3.new(0, 40, 0), ["под полом"] = Vector3.new(0, -30, 0) } do
+		ReplicatedStorage:WaitForChild("EgeTestThrow"):FireServer(point)
+		task.wait(0.3)
+		waitFor("персонаж, оказавшийся " .. name .. ", возвращается в класс", inside, 4)
+	end
+
 	local scoreBoard = classroom:FindFirstChild("ScoreBoard")
 	check("доска побед с текстом", scoreBoard and findText(scoreBoard, "Пока никто не сыграл") ~= nil)
 

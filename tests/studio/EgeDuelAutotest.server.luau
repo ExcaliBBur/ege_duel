@@ -86,6 +86,16 @@ walkRequest.OnServerEvent:Connect(function(player: Player, part: any)
 	character:PivotTo(CFrame.new(flat + toCenter * 4 + Vector3.new(0, 3.5, 0)))
 end)
 
+-- Переносит персонажа в указанную точку: так проверяется возврат из-за пределов класса.
+local throwRequest = Instance.new("RemoteEvent")
+throwRequest.Name = "EgeTestThrow"
+throwRequest.Parent = ReplicatedStorage
+throwRequest.OnServerEvent:Connect(function(player: Player, position: any)
+	if player.Character and typeof(position) == "Vector3" then
+		player.Character:PivotTo(CFrame.new(position))
+	end
+end)
+
 -- Запасной путь посадки, если подсказку у стула не удалось нажать из сценария.
 seatRequest.OnServerEvent:Connect(function(player: Player)
 	local character = player.Character
