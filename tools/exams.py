@@ -7,10 +7,12 @@ SKIPPED: номера первой части, которые нельзя пе�
 
 import exam_math_base
 import exam_math_prof
+import exam_physics
 
 EXAMS = {
     "math_base": exam_math_base.NUMBERS,
     "math_prof": exam_math_prof.NUMBERS,
+    "physics": exam_physics.NUMBERS,
 }
 
 # Сколько заданий в первой части (с кратким ответом) у каждого предмета.

@@ -48,11 +48,10 @@ samples.Name = "EgeTestSamples"
 samples.Parent = ReplicatedStorage
 samples.OnServerInvoke = function()
 	local wanted = {
-		{ "math_base", { "b2_units", "b3_bar_chart", "b3_price_graph", "b6_carriers", "b6_internet", "b6_route", "b7_function_points",
-			"b7_speed_intervals", "b8_clubs", "b9_rhombus", "b9_plan", "b18_number_line", "b18_quadratic" } },
-		{ "math_prof", { "p1_right_triangle", "p1_circle_angles", "s_cylinder", "st_table", "d_graph_tangent", "d_graph_derivative",
-			"d_graph_points", "g_two_lines", "g_parabola", "g_hyperbola", "g_exponent", "g_logarithm", "g_root" } },
-		{ "physics", { "fig_xt_graph", "fig_circuit_series", "fig_circuit_parallel", "fig_forces", "fig_pv_work", "fig_iu_graph" } },
+		{ "physics", { "a_graph", "h_melting_graph", "h_cycle", "c_graph", "i_reading", "x_setups", "mechanics_changes", "general_statements",
+			"fig_xt_graph", "fig_circuit_series", "fig_forces" } },
+		{ "math_base", { "b3_bar_chart", "b6_carriers", "b7_function_points", "b9_plan", "b18_number_line" } },
+		{ "math_prof", { "p1_circle_angles", "st_table", "d_graph_derivative", "g_hyperbola", "g_logarithm" } },
 		{ "informatics", { "fig_paths", "fig_spreadsheet" } },
 		{ "chemistry", { "fig_atom", "fig_skeleton" } },
 		{ "biology", { "fig_punnett", "fig_dna" } },

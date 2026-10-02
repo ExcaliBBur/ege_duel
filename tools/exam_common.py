@@ -5,7 +5,7 @@ from collections import namedtuple
 from fractions import Fraction
 
 from figures import Fig
-from generators import dec
+from generators import dec, task
 
 # Один номер экзамена: номер, тема как на «Решу ЕГЭ», первичный балл, генераторы подтипов.
 Entry = namedtuple("Entry", "number title points generators")
@@ -155,3 +155,77 @@ def table_figure(rows, cell_width=62, cell_height=34, first_width=120):
         for column, value in enumerate(row[1:]):
             fig.text(10 + first_width + column * cell_width + cell_width / 2, y, value)
     return fig
+
+
+# ---------------------------------------------------------------- виды заданий, общие для предметов
+
+
+def matching(text, left, right, answer, explanation):
+    """Задание на соответствие: левый столбец с буквами, правый с цифрами, ответ это цифры по порядку букв."""
+    letters = "АБВГД"
+    lines = [f"{letters[i]}) {item}" for i, item in enumerate(left)] + [""] + [f"{i + 1}) {item}" for i, item in enumerate(right)]
+    made = task(
+        text + " Запишите цифры в порядке букв " + "".join(letters[: len(left)]) + ", без пробелов.\n\n" + "\n".join(lines),
+        answer,
+        explanation,
+    )
+    made["kind"] = "order"
+    return made
+
+
+def choose(text, statements, correct, explanation):
+    """Выбор всех верных утверждений; ответ это их номера по возрастанию."""
+    lines = [f"{i + 1}) {statement}" for i, statement in enumerate(statements)]
+    made = task(
+        text + " В ответе запишите номера выбранных утверждений без пробелов и запятых.\n\n" + "\n".join(lines),
+        "".join(str(i + 1) for i in range(len(statements)) if correct[i]),
+        explanation,
+    )
+    made["kind"] = "set"
+    return made
+
+
+def pick_statements(r, pool, count=5, true_counts=(2, 3)):
+    """Выбирает count утверждений из набора так, чтобы верных было 2 или 3.
+
+    Элемент набора: пара (текст, верно ли) или список таких пар, из которого берётся одна
+    (так верная и неверная версии одного факта не попадают в задание вместе).
+    """
+    for _ in range(400):
+        items = [r.choice(item) if isinstance(item, list) else item for item in pool]
+        picked = r.sample(items, count)
+        if sum(1 for _, flag in picked if flag) in true_counts:
+            return [text for text, _ in picked], [flag for _, flag in picked]
+    raise ValueError("в наборе не хватает верных или неверных утверждений")
+
+
+def changes(r, scenario, lead, quantities, explanation):
+    """Задание на изменение величин: для двух величин выбрать «увеличится», «уменьшится» или «не изменится».
+
+    quantities: словарь «величина -> цифра ответа» (1, 2 или 3); в задание попадают две случайные.
+    """
+    first, second = r.sample(sorted(quantities), 2)
+    made = task(
+        f"{scenario} {lead} величины «{first}» и «{second}»?\n\n"
+        "Для каждой величины определите характер изменения:\n1) увеличивается\n2) уменьшается\n3) не изменяется\n\n"
+        "Запишите в ответ две цифры в том же порядке, в каком названы величины. Цифры могут повторяться.",
+        f"{quantities[first]}{quantities[second]}",
+        explanation,
+    )
+    made["kind"] = "order"
+    return made
+
+
+def formulas(r, scenario, pairs, extra=()):
+    """Соответствие «физическая величина -> формула»: две величины и четыре формулы."""
+    asked = r.sample(pairs, 2)
+    others = [formula for _, formula in pairs if formula not in [f for _, f in asked]] + list(extra)
+    options = [formula for _, formula in asked] + r.sample(others, 2)
+    r.shuffle(options)
+    return matching(
+        f"{scenario} Установите соответствие между физическими величинами и формулами, по которым их можно рассчитать.",
+        [name for name, _ in asked],
+        options,
+        "".join(str(options.index(formula) + 1) for _, formula in asked),
+        "; ".join(f"{name}: {formula}" for name, formula in asked) + ".",
+    )

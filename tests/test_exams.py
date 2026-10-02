@@ -136,5 +136,56 @@ class MathProfileTest(unittest.TestCase):
             self.assertEqual(x * x + y * y, number_of(made["answer"]) ** 2, made["text"])
 
 
+class PhysicsTest(unittest.TestCase):
+    def setUp(self):
+        import exam_physics
+        self.p = exam_physics
+        self.rng = random.Random(8)
+
+    def test_lens_data_satisfies_lens_formula(self):
+        for distance, image, focus in self.p.LENS + self.p.LENS_CASES:
+            self.assertEqual(Fraction(1, distance) + Fraction(1, image), Fraction(1, focus), (distance, image, focus))
+
+    def test_change_tables_use_valid_codes(self):
+        for table in (self.p.MECHANICS_CHANGES, self.p.THERMAL_CHANGES, self.p.ELECTRIC_CHANGES, self.p.QUANTUM_CHANGES):
+            for scenario, _, quantities, explanation in table:
+                self.assertGreaterEqual(len(quantities), 3, scenario)
+                self.assertTrue(all(code in (1, 2, 3) for code in quantities.values()), scenario)
+                self.assertTrue(explanation)
+
+    def test_reactions_conserve_charge_and_mass(self):
+        for left, right in self.p.REACTIONS:
+            self.assertGreater(sum(a for a, _, _ in left), sum(a for a, _, _ in right))
+            self.assertGreaterEqual(sum(z for _, z, _ in left), sum(z for _, z, _ in right))
+
+    def test_instrument_reading_is_a_whole_number_of_divisions(self):
+        for _ in range(200):
+            made = self.p.i_reading(self.rng)
+            match = re.search(r"\(([\d,]+) ± ([\d,]+)\)", made["explanation"])
+            value, division = number_of(match.group(1)), number_of(match.group(2))
+            self.assertEqual(made["answer"], match.group(1) + match.group(2))
+            self.assertEqual((value / division).denominator, 1, made["explanation"])
+            self.assertEqual(len(match.group(1).partition(",")[2]), len(match.group(2).partition(",")[2]))
+
+    def test_experiment_has_exactly_one_suitable_pair(self):
+        for _ in range(200):
+            made = self.p.x_setups(self.rng)
+            cells = [shape[3] for shape in made["figure"]["items"] if shape[0] == "text"]
+            rows = [cells[i:i + 4] for i in range(0, len(cells), 4)]
+            headers, setups = rows[0][1:], [row[1:] for row in rows[1:]]
+            studied = next(i for i, header in enumerate(headers) if header.lower() in made["explanation"])
+            good = [f"{i + 1}{j + 1}" for i in range(5) for j in range(i + 1, 5)
+                    if [k for k in range(3) if setups[i][k] != setups[j][k]] == [studied]]
+            self.assertEqual(good, [made["answer"]], made["text"])
+
+    def test_statement_tasks_have_two_or_three_correct(self):
+        for generator in (self.p.a_throw, self.p.a_graph, self.p.a_pendulum, self.p.h_melting_graph, self.p.h_isobaric, self.p.h_cycle,
+                          self.p.c_series, self.p.c_lens, self.p.c_graph, self.p.general_statements):
+            for _ in range(60):
+                made = generator(self.rng)
+                self.assertIn(len(made["answer"]), (2, 3), generator.__name__)
+                self.assertEqual(made["text"].count("\n") - 1, 5, generator.__name__)
+
+
 if __name__ == "__main__":
     unittest.main()

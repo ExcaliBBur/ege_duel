@@ -9,34 +9,9 @@ from fractions import Fraction
 
 import exam_math_prof as prof
 import figures
-from exam_common import Entry, Plane, frac, is_finite_decimal, plural, quotient, round_half_up, table_figure
+from exam_common import Entry, Plane, choose, frac, is_finite_decimal, matching, plural, quotient, round_half_up, table_figure
 from figures import Fig
 from generators import dec, poly, task
-
-
-def matching(text, left, right, answer, explanation):
-    """Задание на соответствие: левый столбец с буквами, правый с цифрами, ответ это цифры по порядку букв."""
-    letters = "АБВГ"
-    lines = [f"{letters[i]}) {item}" for i, item in enumerate(left)] + [""] + [f"{i + 1}) {item}" for i, item in enumerate(right)]
-    made = task(
-        text + " Запишите цифры в порядке букв " + "".join(letters[: len(left)]) + ", без пробелов.\n\n" + "\n".join(lines),
-        answer,
-        explanation,
-    )
-    made["kind"] = "order"
-    return made
-
-
-def choose(text, statements, correct, explanation):
-    """Выбор всех верных утверждений; ответ это их номера по возрастанию."""
-    lines = [f"{i + 1}) {statement}" for i, statement in enumerate(statements)]
-    made = task(
-        text + " В ответе запишите номера выбранных утверждений без пробелов и запятых.\n\n" + "\n".join(lines),
-        "".join(str(i + 1) for i in range(len(statements)) if correct[i]),
-        explanation,
-    )
-    made["kind"] = "set"
-    return made
 
 
 # ---------------------------------------------------------------- №1 Простейшие текстовые задачи
