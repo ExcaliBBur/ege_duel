@@ -25,7 +25,7 @@ $project = if ($Profile) { "profile.project.json" } elseif ($Shots) { "shots.pro
 $projectPath = if ($env:EGE_TEST_PROJECT) { $env:EGE_TEST_PROJECT } else { Join-Path $PSScriptRoot $project }
 & $rojo build $projectPath -o $place | Out-Null
 if ($Shots) {
-    Start-Process powershell -WindowStyle Hidden -ArgumentList "-ExecutionPolicy", "Bypass", "-File", "`"$(Join-Path $PSScriptRoot 'capture_window.ps1')`"", "-Seconds", "210" | Out-Null
+    Start-Process powershell -WindowStyle Hidden -ArgumentList "-ExecutionPolicy", "Bypass", "-File", "`"$(Join-Path $PSScriptRoot 'capture_window.ps1')`"", "-Seconds", "330" | Out-Null
 }
 
 $started = Get-Date

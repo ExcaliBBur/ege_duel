@@ -55,6 +55,125 @@ class StructureTest(unittest.TestCase):
                 self.assertLessEqual(counts.get(entry.number, 0), 20, f"{subject} №{entry.number}")
 
 
+class PartTwoTest(unittest.TestCase):
+    """Вторая часть: расчётные задачи с числом в ответе и развёрнутые ответы с эталоном и критериями."""
+
+    def test_numbers_do_not_clash_with_part_one(self):
+        for subject, entries in exams.PART_TWO.items():
+            numbers = [entry.number for entry in entries]
+            self.assertEqual(numbers, sorted(set(numbers)), subject)
+            first = {entry.number for entry in exams.EXAMS[subject]}
+            self.assertFalse(first & set(numbers), f"{subject}: номер есть в обеих частях")
+
+    def test_every_generator_gives_valid_tasks(self):
+        rng = random.Random(12)
+        for subject, entries in exams.PART_TWO.items():
+            for entry in entries:
+                for generator in entry.generators:
+                    for _ in range(150):
+                        made = generator(rng)
+                        item = {
+                            "text": made["text"],
+                            "answers": made.get("answers") or [made["answer"]],
+                            "points": made.get("points", entry.points),
+                            "kind": made.get("kind") or "number",
+                            "explanation": made["explanation"],
+                            "part": 2,
+                        }
+                        if "criteria" in made:
+                            item["criteria"] = made["criteria"]
+                        self.assertEqual(build_bank.check(subject, item), [], f"{subject} №{entry.number} {generator.__name__}")
+                        self.assertLessEqual(len(made["text"]), 2500, f"{subject} №{entry.number}: слишком длинное условие")
+
+    def test_every_number_has_enough_variants(self):
+        for subject in exams.PART_TWO:
+            tasks = build_bank.generate_numbered(subject, random.Random(3), 20, part=2)
+            self.assertTrue(all(item["part"] == 2 for item in tasks))
+            counts = {}
+            for item in tasks:
+                counts[item["number"]] = counts.get(item["number"], 0) + 1
+            for entry in exams.PART_TWO[subject]:
+                self.assertGreaterEqual(counts.get(entry.number, 0), exams.PART_TWO_MINIMUM, f"{subject} №{entry.number}")
+
+    def test_russian_essay_uses_the_stories_of_part_one(self):
+        # Сочинение пишется по тому же тексту, что и задания 23-26: у них общий context.
+        first = build_bank.generate_numbered("russian", random.Random(3), 20)
+        stories = {item["context"] for item in first if item.get("context", "").startswith("story:")}
+        second = {item["context"] for item in build_bank.generate_numbered("russian", random.Random(3), 20, part=2)}
+        self.assertEqual(stories, second)
+
+    def test_check_rules_for_essays(self):
+        good = {"text": "Вопрос", "answers": ["-"], "points": 6, "kind": "essay", "explanation": "Эталон.", "criteria": ["1 балл: верно."], "part": 2}
+        self.assertEqual(build_bank.check("x", good), [])
+        self.assertTrue(build_bank.check("x", {**good, "criteria": []}))
+        self.assertTrue(build_bank.check("x", {**good, "points": 26}))
+        self.assertTrue(build_bank.check("x", {key: value for key, value in good.items() if key != "part"}))
+        self.assertTrue(build_bank.check("x", {**good, "kind": "number", "answers": ["5"]}))  # критерии без развёрнутого ответа
+
+    def test_loan_with_equal_payments_is_repaid(self):
+        import part2_math
+        rng = random.Random(4)
+        for _ in range(100):
+            made = part2_math.e_equal_payments(rng)
+            total, rate = (int(n) for n in re.search(r"сумму (\d+) тыс.*возрастает на (\d+)%", made["text"]).groups())
+            payment = number_of(re.search(r"= (\d+) тыс. рублей", made["explanation"]).group(1))
+            q = Fraction(100 + rate, 100)
+            self.assertEqual((total * q - payment) * q - payment, 0, made["text"])
+            expected = 2 * payment - total if "больше суммы кредита" in made["text"] else payment
+            self.assertEqual(number_of(made["answer"]), expected)
+
+    def test_decreasing_debt_total_by_direct_sum(self):
+        import part2_math
+        rng = random.Random(4)
+        for _ in range(100):
+            made = part2_math.e_decreasing_debt(rng)
+            total, months, rate = (int(n) for n in re.search(r"сумму (\d+) тыс. рублей на (\d+) месяц.*возрастает на (\d+)%", made["text"], re.S).groups())
+            paid = sum(Fraction(total, months) + Fraction(total * (months - k), months) * rate / 100 for k in range(months))
+            self.assertEqual(number_of(made["answer"]), paid, made["text"])
+
+    def test_pyramid_distance(self):
+        import part2_math
+        rng = random.Random(4)
+        for _ in range(60):
+            made = part2_math.s_pyramid(rng)
+            side, height = (int(n) for n in re.search(r"основания равна (\d+), а высота равна (\d+)", made["text"]).groups())
+            # Расстояние от центра до грани: в прямоугольном треугольнике с катетами side/2 и height это высота к гипотенузе.
+            distance = (side / 2) * height / ((side / 2) ** 2 + height ** 2) ** 0.5
+            factor = 2 if "от вершины A" in made["text"] else 1
+            self.assertAlmostEqual(float(number_of(made["answer"])), factor * distance, places=9)
+
+    def test_lens_answers_satisfy_lens_formula(self):
+        import part2_physics
+        rng = random.Random(4)
+        for _ in range(100):
+            made = part2_physics.e_lens(rng)
+            distance, focus = (number_of(n) for n in re.search(r"расстоянии ([\d,]+) см от.*расстоянием (\d+) см", made["text"]).groups())
+            image = 1 / (1 / focus - 1 / distance)
+            if "изображение предмета" in made["text"]:
+                self.assertEqual(number_of(made["answer"]), image)
+            else:
+                self.assertAlmostEqual(float(number_of(made["answer"])), float(image / distance), delta=0.005)
+
+    def test_chemistry_mass_fraction(self):
+        import part2_chemistry
+        rng = random.Random(4)
+        for _ in range(100):
+            made = part2_chemistry.c_zinc(rng)
+            zinc, solution, share = (number_of(n) for n in re.search(r"массой ([\d,]+) г полностью растворили в (\d+) г (\d+)%", made["text"]).groups())
+            moles = zinc / 65
+            self.assertGreater(solution * share / 100 / Fraction(73, 2), 2 * moles)  # кислоты хватает
+            self.assertAlmostEqual(float(number_of(made["answer"])), float(136 * moles / (solution + zinc - 2 * moles) * 100), delta=0.05)
+
+    def test_longitude_matches_time_difference(self):
+        import part2_humanities
+        rng = random.Random(4)
+        for _ in range(100):
+            made = part2_humanities.g_longitude(rng)
+            hours, minutes = (int(n) for n in re.search(r"меридиане (\d+) ч (\d+) мин", made["text"]).groups())
+            # Полдень в Гринвиче в 12:00; каждый градус к востоку приближает местный полдень на 4 минуты.
+            self.assertEqual(number_of(made["answer"]), Fraction(12 * 60 - (hours * 60 + minutes), 4))
+
+
 class MathProfileTest(unittest.TestCase):
     """Независимая проверка ответов: уравнения подстановкой, вероятности перебором."""
 

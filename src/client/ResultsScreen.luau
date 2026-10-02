@@ -134,7 +134,7 @@ function ResultsScreen.create(parent: Instance, actions)
 		Ui.new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }),
 	})
 	local emptyNote = Ui.label({
-		Text = "Ошибок нет. Все ответы верные.",
+		Text = "Ошибок нет. За все задания получен полный балл.",
 		TextColor3 = C.ok,
 		Font = Ui.fonts.bold,
 		Position = UDim2.fromOffset(20, 290),
@@ -171,10 +171,11 @@ function ResultsScreen.create(parent: Instance, actions)
 
 	local function reviewRow(index: number, item)
 		local full = item.earned == item.points
+		local tone = if item.void then C.muted elseif full then C.ok elseif item.earned > 0 then C.warn else C.danger
 		local row = Ui.frame({
 			Size = UDim2.new(1, -12, 0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundColor3 = if full then C.okSoft elseif item.earned > 0 then C.warnSoft else C.dangerSoft,
+			BackgroundColor3 = if item.void then C.sunken elseif full then C.okSoft elseif item.earned > 0 then C.warnSoft else C.dangerSoft,
 			LayoutOrder = index,
 		}, {
 			Ui.corner(8),
@@ -188,11 +189,21 @@ function ResultsScreen.create(parent: Instance, actions)
 		})
 
 		local yours = if item.your == "" then "ответа нет" else "ваш ответ: " .. item.your
+		local head
+		if not item.essay then
+			head = string.format("№ %d · %d из %d · %s · верно: %s", item.number or index, item.earned, item.points, yours, item.correct)
+		elseif item.void then
+			head = string.format("№ %d · в счёт не идёт: текст ответа не прошёл фильтр Roblox и не был показан сопернику", item.number or index)
+		elseif item.your == "" then
+			head = string.format("№ %d · 0 из %d · развёрнутого ответа нет", item.number or index, item.points)
+		else
+			head = string.format("№ %d · %d из %d · оценку поставил соперник", item.number or index, item.earned, item.points)
+		end
 		Ui.label({
-			Text = string.format("№ %d · %d из %d · %s · верно: %s", item.number or index, item.earned, item.points, yours, item.correct),
+			Text = head,
 			Font = Ui.fonts.bold,
 			TextSize = 15,
-			TextColor3 = if full then C.ok elseif item.earned > 0 then C.warn else C.danger,
+			TextColor3 = tone,
 			Size = UDim2.new(1, 0, 0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			LayoutOrder = 1,
@@ -211,9 +222,33 @@ function ResultsScreen.create(parent: Instance, actions)
 		if figure then
 			figure.LayoutOrder = 3
 		end
+		if item.essay and item.your ~= "" then
+			Ui.label({
+				Text = "Ваш ответ: " .. item.your,
+				TextSize = 14,
+				TextColor3 = C.accent,
+				Size = UDim2.new(1, 0, 0, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				TextYAlignment = Enum.TextYAlignment.Top,
+				LayoutOrder = 3,
+				Parent = row,
+			})
+		end
+		if item.essay and item.criteria then
+			Ui.label({
+				Text = "Критерии: " .. table.concat(item.criteria, " "),
+				TextSize = 14,
+				TextColor3 = C.muted,
+				Size = UDim2.new(1, 0, 0, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				TextYAlignment = Enum.TextYAlignment.Top,
+				LayoutOrder = 5,
+				Parent = row,
+			})
+		end
 		if item.explanation and item.explanation ~= "" then
 			Ui.label({
-				Text = "Пояснение: " .. item.explanation,
+				Text = (if item.essay then "Эталон: " else "Пояснение: ") .. item.explanation,
 				TextSize = 14,
 				TextColor3 = C.muted,
 				Size = UDim2.new(1, 0, 0, 0),
@@ -234,7 +269,7 @@ function ResultsScreen.create(parent: Instance, actions)
 		end
 		local shown = 0
 		for index, item in state.review do
-			if not onlyMistakes or item.earned < item.points then
+			if not onlyMistakes or item.earned < item.points or item.void then
 				reviewRow(index, item).Parent = list
 				shown += 1
 			end

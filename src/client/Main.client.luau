@@ -11,6 +11,7 @@ local Ui = require(script.Parent.Ui)
 local SetupScreen = require(script.Parent.SetupScreen)
 local ExamScreen = require(script.Parent.ExamScreen)
 local ResultsScreen = require(script.Parent.ResultsScreen)
+local ReviewScreen = require(script.Parent.ReviewScreen)
 local Perf = require(script.Parent.Perf)
 
 local player = Players.LocalPlayer
@@ -80,6 +81,9 @@ local setup = SetupScreen.create(panel, {
 	voteCount = function(count: number)
 		send("voteCount", count)
 	end,
+	votePart = function(value: boolean)
+		send("votePart", value)
+	end,
 	ready = function(value: boolean)
 		send("ready", value)
 	end,
@@ -94,6 +98,15 @@ local exam = ExamScreen.create(panel, {
 	end,
 	submit = function()
 		send("submit")
+	end,
+})
+
+local review = ReviewScreen.create(panel, {
+	grade = function(index: number, score: number)
+		send("grade", { index = index, score = score })
+	end,
+	done = function()
+		send("reviewDone")
 	end,
 })
 
@@ -191,15 +204,18 @@ local function showOnly(name: string?)
 	if name ~= "exam" then
 		exam.hide()
 	end
+	if name ~= "review" then
+		review.hide()
+	end
 	if name ~= "results" then
 		results.hide()
 	end
 	countdown.Visible = name == "countdown"
 	waiting.Visible = name == "waiting"
 	waitingBot.Visible = false
-	dim.Visible = name == "setup" or name == "exam" or name == "results" or name == "countdown"
+	dim.Visible = name == "setup" or name == "exam" or name == "review" or name == "results" or name == "countdown"
 
-	jumpLocked = name == "exam" or name == "countdown"
+	jumpLocked = name == "exam" or name == "review" or name == "countdown"
 	applyJumpLock()
 	Perf.setPhase(name or "класс")
 end
@@ -232,12 +248,24 @@ stateEvent.OnClientEvent:Connect(function(state)
 				if state.lotTime then "Жребий выбрал время:" else "Время на работу:",
 				state.time
 			),
-			string.format("%s %d", if state.lotCount then "Жребий выбрал число заданий:" else "Число заданий:", state.count),
+			string.format(
+				"%s %s",
+				if state.lotCount then "Жребий выбрал задания первой части:" else "Задания первой части:",
+				if state.count == 0 then "все" else tostring(state.count)
+			),
+			string.format(
+				"%s %s",
+				if state.lotPart then "Жребий решил:" else "Вторая часть:",
+				if state.part then "вторая часть есть, развёрнутые ответы оценит соперник" else "без второй части"
+			),
 		}
 		countdownInfo.Text = table.concat(lines, "\n")
 	elseif phase == "exam" then
 		showOnly("exam")
 		exam.show(state)
+	elseif phase == "review" then
+		showOnly("review")
+		review.show(state)
 	elseif phase == "results" then
 		showOnly("results")
 		results.show(state)

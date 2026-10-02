@@ -3,7 +3,7 @@
  "subjects": {
   "russian": {
    "file": "russian.json",
-   "count": 417
+   "count": 420
   },
   "math_base": {
    "file": "math_base.json",
@@ -11,19 +11,19 @@
   },
   "math_prof": {
    "file": "math_prof.json",
-   "count": 240
+   "count": 328
   },
   "physics": {
    "file": "physics.json",
-   "count": 400
+   "count": 506
   },
   "chemistry": {
    "file": "chemistry.json",
-   "count": 560
+   "count": 601
   },
   "biology": {
    "file": "biology.json",
-   "count": 411
+   "count": 432
   },
   "informatics": {
    "file": "informatics.json",
@@ -31,23 +31,23 @@
   },
   "history": {
    "file": "history.json",
-   "count": 140
+   "count": 156
   },
   "social": {
    "file": "social.json",
-   "count": 320
+   "count": 337
   },
   "geography": {
    "file": "geography.json",
-   "count": 418
+   "count": 486
   },
   "literature": {
    "file": "literature.json",
-   "count": 131
+   "count": 145
   },
   "english": {
    "file": "english.json",
-   "count": 136
+   "count": 142
   }
  }
 }

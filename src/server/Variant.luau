@@ -24,11 +24,10 @@ local function shuffle(list, random)
 	end
 end
 
--- Номера ЕГЭ, для которых в банке есть задания, по возрастанию.
-function Variant.numbersOf(tasks): { number }
+local function numbersOfPart(tasks, partTwo: boolean): { number }
 	local seen, numbers = {}, {}
 	for _, task in tasks do
-		if task.number and not seen[task.number] then
+		if task.number and (task.part == 2) == partTwo and not seen[task.number] then
 			seen[task.number] = true
 			table.insert(numbers, task.number)
 		end
@@ -37,10 +36,20 @@ function Variant.numbersOf(tasks): { number }
 	return numbers
 end
 
+-- Номера первой части (с кратким ответом), для которых в банке есть задания, по возрастанию.
+function Variant.numbersOf(tasks): { number }
+	return numbersOfPart(tasks, false)
+end
+
+-- Номера второй части (с развёрнутым ответом), по возрастанию.
+function Variant.partTwoNumbersOf(tasks): { number }
+	return numbersOfPart(tasks, true)
+end
+
 -- Вариант по номерам. count = 0 означает всю первую часть; иначе номера делятся на count
 -- подряд идущих групп и из каждой берётся один случайный номер, чтобы сокращённый вариант
--- охватывал экзамен от начала до конца.
-local function pickByNumbers(tasks, numbers: { number }, count: number, random)
+-- охватывал экзамен от начала до конца. С withPartTwo в конец добавляется вся вторая часть.
+local function pickByNumbers(tasks, numbers: { number }, count: number, random, withPartTwo: boolean)
 	local byNumber = {}
 	for _, task in tasks do
 		if task.number then
@@ -56,6 +65,12 @@ local function pickByNumbers(tasks, numbers: { number }, count: number, random)
 			local first = math.floor((group - 1) * #numbers / count) + 1
 			local last = math.floor(group * #numbers / count)
 			table.insert(chosen, numbers[first + random(last - first + 1) - 1])
+		end
+	end
+	if withPartTwo then
+		chosen = table.clone(chosen)
+		for _, number in Variant.partTwoNumbersOf(tasks) do
+			table.insert(chosen, number)
 		end
 	end
 
@@ -128,11 +143,12 @@ local function pickByGroups(tasks, count: number, random)
 end
 
 -- count = 0 означает всю первую часть (для банка без номеров это 20 заданий).
-function Variant.pick(tasks, count: number, seed: number)
+-- withPartTwo: добавить после первой части все номера второй части.
+function Variant.pick(tasks, count: number, seed: number, withPartTwo: boolean?)
 	local random = newRandom(seed)
 	local numbers = Variant.numbersOf(tasks)
 	if #numbers > 0 then
-		return pickByNumbers(tasks, numbers, count, random)
+		return pickByNumbers(tasks, numbers, count, random, withPartTwo == true)
 	end
 	return pickByGroups(tasks, if count > 0 then count else 20, random)
 end

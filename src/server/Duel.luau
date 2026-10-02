@@ -3,10 +3,12 @@
 --   setup      двое выбирают предметы и голосуют за время и число заданий
 --   countdown  отсчёт перед началом
 --   exam       идёт экзамен
+--   review     взаимная проверка развёрнутых ответов второй части
 --   results    показаны итоги, можно взять реванш
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TextService = game:GetService("TextService")
 local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -62,6 +64,7 @@ local function newSlot(player: Player, index: number)
 		subject = nil,
 		timeVote = Settings.defaultTime,
 		countVote = Settings.defaultCount,
+		partVote = false,
 		ready = false,
 		tasks = {},
 		answers = {},
@@ -82,6 +85,7 @@ local function newBotSlot(index: number)
 		subject = nil,
 		timeVote = Settings.defaultTime,
 		countVote = Settings.defaultCount,
+		partVote = false,
 		ready = false,
 		tasks = {},
 		answers = {},
@@ -113,6 +117,8 @@ local function refreshStatus(tbl)
 			string.format("Решено %d и %d · осталось %s", a.answered, b.answered, formatClock(tbl.endsAt - now())),
 			true
 		)
+	elseif phase == "review" then
+		tbl.setStatus("Проверяют работы друг друга", true)
 	elseif phase == "results" then
 		tbl.setStatus("Матч окончен", true)
 	end
@@ -141,6 +147,51 @@ local function fullCounts()
 	return counts
 end
 
+-- Сколько номеров во второй части каждого предмета.
+local function partTwoCounts()
+	local counts = {}
+	for _, subject in Subjects.list do
+		counts[subject.id] = Bank.partTwoCount(subject.id)
+	end
+	return counts
+end
+
+local function isBlank(answer: string?): boolean
+	return answer == nil or Text.normalize(answer) == ""
+end
+
+-- Снимок этапа взаимной проверки для одного игрока: работы соперника, которые ему нужно оценить.
+local function reviewSnapshot(tbl, slot)
+	local rival = tbl.slots[3 - slot.index]
+	local items = {}
+	for _, taskIndex in slot.reviewItems do
+		local task = rival.tasks[taskIndex]
+		table.insert(items, {
+			index = taskIndex,
+			number = task.number,
+			topic = task.topic,
+			text = task.text,
+			figure = task.figure,
+			points = task.points,
+			solution = task.explanation,
+			criteria = task.criteria,
+			answer = rival.shown[taskIndex],
+			score = slot.grades[taskIndex],
+		})
+	end
+	return {
+		phase = "review",
+		tableId = tbl.id,
+		endsAt = tbl.reviewEndsAt,
+		rivalName = rival.name,
+		rivalSubject = rival.subject,
+		items = items,
+		done = slot.reviewDone,
+		rivalDone = rival.reviewDone,
+		waitingForMe = #rival.reviewItems, -- сколько моих ответов оценивает соперник
+	}
+end
+
 local function rivalProgress(slot)
 	return {
 		answered = slot.answered,
@@ -161,12 +212,14 @@ local function snapshotFor(tbl, slot)
 			tableId = tbl.id,
 			counts = bankCounts(),
 			fullCounts = fullCounts(),
-			me = { subject = slot.subject, time = slot.timeVote, count = slot.countVote, ready = slot.ready },
+			partTwoCounts = partTwoCounts(),
+			me = { subject = slot.subject, time = slot.timeVote, count = slot.countVote, part = slot.partVote, ready = slot.ready },
 			rival = {
 				name = rival.name,
 				subject = rival.subject,
 				time = rival.timeVote,
 				count = rival.countVote,
+				part = rival.partVote,
 				ready = rival.ready,
 			},
 		}
@@ -180,6 +233,8 @@ local function snapshotFor(tbl, slot)
 			count = settings.count,
 			lotTime = settings.lotTime,
 			lotCount = settings.lotCount,
+			part = settings.part,
+			lotPart = settings.lotPart,
 			subject = slot.subject,
 			rivalName = rival.name,
 			rivalSubject = rival.subject,
@@ -194,6 +249,8 @@ local function snapshotFor(tbl, slot)
 				figure = task.figure,
 				number = task.number,
 				topic = task.topic,
+				part = task.part,
+				essay = task.kind == "essay" or nil, -- развёрнутый ответ: большое поле вместо клеток
 			}
 		end
 		local progress = rivalProgress(rival)
@@ -208,6 +265,8 @@ local function snapshotFor(tbl, slot)
 			tasks = publicTasks,
 			rival = progress,
 		}
+	elseif phase == "review" then
+		return reviewSnapshot(tbl, slot)
 	end
 	return { phase = "none" }
 end
@@ -244,7 +303,7 @@ local function reseat(tbl, slot)
 	if tbl.slots[slot.index] ~= slot or not isPresent(slot) then
 		return
 	end
-	if tbl.phase ~= "exam" and tbl.phase ~= "countdown" then
+	if tbl.phase ~= "exam" and tbl.phase ~= "countdown" and tbl.phase ~= "review" then
 		return
 	end
 	local seat = tbl.seats[slot.index]
@@ -258,7 +317,7 @@ local function reseat(tbl, slot)
 	end
 end
 
--- Убирает игрока из-за парты. В фазах exam и countdown не вызывается.
+-- Убирает игрока из-за парты. В фазах exam, review и countdown не вызывается.
 local function removeSlot(tbl, index: number)
 	local slot = tbl.slots[index]
 	if not slot then
@@ -303,6 +362,11 @@ local function syncBot(tbl)
 			if human then
 				slot.timeVote = human.timeVote
 				slot.countVote = human.countVote
+				slot.partVote = human.partVote
+				-- Со второй частью тестовый соперник берёт предмет игрока: так игроку есть что проверять.
+				if human.partVote and human.subject and Bank.partTwoCount(human.subject) > 0 then
+					slot.subject = human.subject
+				end
 			end
 			slot.ready = slot.subject ~= nil
 		end
@@ -347,6 +411,10 @@ local function buildReview(slot)
 			explanation = task.explanation,
 			figure = task.figure,
 			number = task.number,
+			-- Развёрнутый ответ: оценку поставил соперник по этим критериям.
+			essay = task.kind == "essay" or nil,
+			criteria = task.criteria,
+			void = slot.summary.void[index] or nil,
 		}
 	end
 	return review
@@ -391,16 +459,34 @@ local function refreshScoreboard()
 	showScoreboard(if #lines > 0 then table.concat(lines, "\n") else "Пока никто не сыграл.\nСтаньте первыми!")
 end
 
-local function finish(tbl)
-	tbl.matchId += 1 -- отменяет таймер конца экзамена
+-- Оценки, которые получил автор за развёрнутые ответы. Пустой ответ даёт 0. Ответ, который не удалось
+-- показать сопернику, в счёт не идёт. Если соперник не успел поставить оценку, автор получает полный балл:
+-- так тянуть время с проверкой невыгодно.
+local function givenScores(slot, rival)
+	local given = {}
+	for index, task in slot.tasks do
+		if task.kind == "essay" then
+			if isBlank(slot.answers[index]) then
+				given[index] = 0
+			elseif slot.hidden and slot.hidden[index] then
+				given[index] = false
+			elseif rival.grades and rival.grades[index] ~= nil then
+				given[index] = rival.grades[index]
+			else
+				given[index] = task.points
+			end
+		end
+	end
+	return given
+end
+
+-- Подводит итоги матча: после экзамена, если проверять нечего, или после взаимной проверки.
+local function conclude(tbl)
+	tbl.matchId += 1 -- отменяет таймеры экзамена и проверки
 	tbl.phase = "results"
 	local a, b = tbl.slots[1], tbl.slots[2]
 	for _, slot in { a, b } do
-		if not slot.submitted then
-			slot.submitted = true
-			slot.elapsed = tbl.duration
-		end
-		slot.summary = Scoring.summarize(slot.tasks, slot.answers)
+		slot.summary = Scoring.summarize(slot.tasks, slot.answers, givenScores(slot, rivalOf(tbl, slot)))
 		slot.rematch = slot.bot == true -- тестовый соперник всегда согласен на реванш
 	end
 
@@ -441,6 +527,98 @@ local function finish(tbl)
 	refreshScoreboard()
 end
 
+-- Текст игрока можно показывать другому игроку только после фильтра Roblox.
+local function filterText(text: string, author): string?
+	if author.bot then
+		return text
+	end
+	local ok, result = pcall(function()
+		return TextService:FilterStringAsync(text, author.player.UserId):GetNonChatStringForBroadcastAsync()
+	end)
+	return if ok and type(result) == "string" then result else nil
+end
+
+local function reviewFinished(tbl): boolean
+	for _, slot in tbl.slots do
+		if not slot.reviewDone and isPresent(slot) then
+			return false
+		end
+	end
+	return true
+end
+
+-- Конец экзамена. Если во второй части есть развёрнутые ответы, начинается взаимная проверка, иначе сразу итоги.
+local function finish(tbl)
+	tbl.matchId += 1 -- отменяет таймер конца экзамена
+	local matchId = tbl.matchId
+	local a, b = tbl.slots[1], tbl.slots[2]
+	local everyoneHere = true
+	for _, slot in { a, b } do
+		if not slot.submitted then
+			slot.submitted = true
+			slot.elapsed = tbl.duration
+		end
+		slot.reviewItems = {}
+		slot.grades = {}
+		slot.shown = {}
+		slot.hidden = {}
+		slot.reviewDone = false
+		everyoneHere = everyoneHere and isPresent(slot)
+	end
+	if not everyoneHere then
+		conclude(tbl) -- соперник вышел: победа присуждается без проверки
+		return
+	end
+
+	tbl.phase = "review"
+	refreshStatus(tbl)
+	for _, author in { a, b } do
+		local reviewer = rivalOf(tbl, author)
+		for index, task in author.tasks do
+			if task.kind == "essay" and not isBlank(author.answers[index]) then
+				local shown = filterText(author.answers[index], author) -- может ждать ответа сервиса
+				if shown then
+					author.shown[index] = shown
+					table.insert(reviewer.reviewItems, index)
+				else
+					author.hidden[index] = true
+				end
+			end
+		end
+	end
+	if tbl.matchId ~= matchId or tbl.phase ~= "review" then
+		return -- пока шла фильтрация, матч закончился иначе (кто-то вышел)
+	end
+	if #a.reviewItems == 0 and #b.reviewItems == 0 then
+		conclude(tbl)
+		return
+	end
+
+	for _, slot in { a, b } do
+		if slot.bot then
+			-- Тестовый соперник ставит за каждую работу половину баллов и сразу заканчивает.
+			for _, index in slot.reviewItems do
+				slot.grades[index] = math.ceil(rivalOf(tbl, slot).tasks[index].points / 2)
+			end
+			slot.reviewDone = true
+		elseif #slot.reviewItems == 0 then
+			slot.reviewDone = true -- проверять нечего, игрок просто ждёт
+		end
+	end
+	local seconds = Settings.reviewSeconds(math.max(#a.reviewItems, #b.reviewItems))
+	tbl.reviewEndsAt = now() + seconds
+	push(tbl)
+	if reviewFinished(tbl) then
+		conclude(tbl)
+		return
+	end
+	task.delay(seconds + Settings.graceSeconds, function()
+		if tbl.matchId == matchId and tbl.phase == "review" then
+			conclude(tbl)
+		end
+	end)
+end
+
 local function allDone(tbl): boolean
 	for _, slot in tbl.slots do
 		if not slot.submitted and not slot.left then
@@ -457,6 +635,10 @@ end
 local BOT_ANSWER_SECONDS = 4
 local BOT_CORRECT_CHANCE = 0.6
 
+local function botEssay(botTask, index: number): string
+	return string.format("Тестовый развёрнутый ответ соперника на задание №%d.", botTask.number or index)
+end
+
 -- Тестовый соперник отвечает на одно задание раз в несколько секунд, затем сдаёт работу.
 local function runBot(tbl, slot, matchId: number)
 	local function active(): boolean
@@ -467,7 +649,11 @@ local function runBot(tbl, slot, matchId: number)
 		if not active() or now() >= tbl.endsAt then
 			return
 		end
-		slot.answers[index] = if math.random() < BOT_CORRECT_CHANCE then botTask.answers[1] else "0"
+		if botTask.kind == "essay" then
+			slot.answers[index] = botEssay(botTask, index)
+		else
+			slot.answers[index] = if math.random() < BOT_CORRECT_CHANCE then botTask.answers[1] else "0"
+		end
 		slot.answered = index
 		notifyRival(tbl, slot)
 	end
@@ -489,7 +675,7 @@ local function startExam(tbl)
 	for _, slot in tbl.slots do
 		-- Одинаковый предмет даёт обоим один и тот же вариант.
 		if not variants[slot.subject] then
-			variants[slot.subject] = Variant.pick(Bank.getTasks(slot.subject), settings.count, seed)
+			variants[slot.subject] = Variant.pick(Bank.getTasks(slot.subject), settings.count, seed, settings.part)
 		end
 		slot.tasks = variants[slot.subject]
 		slot.answers = {}
@@ -524,13 +710,19 @@ end
 -- fixed: настройки прошлого матча при реванше; без них настройки берутся из голосов.
 local function startCountdown(tbl, fixed)
 	local a, b = tbl.slots[1], tbl.slots[2]
-	local settings = { lotTime = false, lotCount = false }
+	local settings = { lotTime = false, lotCount = false, lotPart = false }
 	if fixed then
 		settings.time = fixed.time
 		settings.count = fixed.count
+		settings.part = fixed.part
 	else
 		settings.time = a.timeVote
 		settings.count = a.countVote
+		settings.part = a.partVote
+		if a.partVote ~= b.partVote then
+			settings.lotPart = true
+			settings.part = if math.random(2) == 1 then a.partVote else b.partVote
+		end
 		if a.timeVote ~= b.timeVote then
 			settings.lotTime = true
 			settings.time = if math.random(2) == 1 then a.timeVote else b.timeVote
@@ -543,7 +735,7 @@ local function startCountdown(tbl, fixed)
 	tbl.settings = settings
 
 	-- Если был жребий, даём две лишние секунды прочитать его результат.
-	local seconds = Settings.countdownSeconds + (if settings.lotTime or settings.lotCount then 2 else 0)
+	local seconds = Settings.countdownSeconds + (if settings.lotTime or settings.lotCount or settings.lotPart then 2 else 0)
 	tbl.matchId += 1
 	local matchId = tbl.matchId
 	tbl.startsAt = now() + seconds
@@ -596,6 +788,16 @@ function handlers.voteCount(tbl, slot, value)
 	push(tbl)
 end
 
+-- Голос за вторую часть экзамена: true включает задания с развёрнутым ответом.
+function handlers.votePart(tbl, slot, value)
+	if tbl.phase ~= "setup" or type(value) ~= "boolean" then
+		return
+	end
+	slot.partVote = value
+	resetReady(tbl)
+	push(tbl)
+end
+
 function handlers.ready(tbl, slot, value)
 	if tbl.phase ~= "setup" then
 		return
@@ -637,7 +839,7 @@ function handlers.addBot(tbl, slot)
 end
 
 function handlers.leave(tbl, slot)
-	if tbl.phase == "exam" or tbl.phase == "countdown" then
+	if tbl.phase == "exam" or tbl.phase == "countdown" or tbl.phase == "review" then
 		return
 	end
 	local player, seat = slot.player, tbl.seats[slot.index]
@@ -656,16 +858,26 @@ function handlers.answer(tbl, slot, payload)
 	if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #slot.tasks then
 		return
 	end
-	if type(value) ~= "string" or #value > 200 then
+	if type(value) ~= "string" then
 		return
 	end
-	-- В бланке дробная часть отделяется запятой, поэтому точка всегда заменяется на запятую.
-	slot.answers[index] = (string.gsub(Text.truncate(value, Settings.answerMaxChars), "%.", ","))
+	if slot.tasks[index].kind == "essay" then
+		-- Развёрнутый ответ: длинный текст, переносы строк и точки сохраняются.
+		if #value > Settings.essayMaxChars * 4 then
+			return
+		end
+		slot.answers[index] = Text.truncate(value, Settings.essayMaxChars)
+	else
+		if #value > 200 then
+			return
+		end
+		-- В бланке дробная часть отделяется запятой, поэтому точка всегда заменяется на запятую.
+		slot.answers[index] = (string.gsub(Text.truncate(value, Settings.answerMaxChars), "%.", ","))
+	end
 
 	local answered = 0
 	for taskIndex = 1, #slot.tasks do
-		local answer = slot.answers[taskIndex]
-		if answer and Text.normalize(answer) ~= "" then
+		if not isBlank(slot.answers[taskIndex]) then
 			answered += 1
 		end
 	end
@@ -684,12 +896,52 @@ function handlers.submit(tbl, slot)
 	notifyRival(tbl, slot)
 	local rival = rivalOf(tbl, slot)
 	if rival.bot and not rival.submitted then
-		-- Тестовый соперник не заставляет себя ждать.
+		-- Тестовый соперник не заставляет себя ждать. Развёрнутые ответы он дописывает сразу,
+		-- чтобы в Studio можно было попробовать экран взаимной проверки.
+		for index, botTask in rival.tasks do
+			if botTask.kind == "essay" and isBlank(rival.answers[index]) then
+				rival.answers[index] = botEssay(botTask, index)
+			end
+		end
 		rival.submitted = true
 		rival.elapsed = slot.elapsed
 	end
 	if allDone(tbl) then
 		finish(tbl)
+	end
+end
+
+-- Оценка за развёрнутый ответ соперника. payload: { index = номер задания в его варианте, score = балл }.
+function handlers.grade(tbl, slot, payload)
+	if tbl.phase ~= "review" or slot.reviewDone or type(payload) ~= "table" then
+		return
+	end
+	local index, score = payload.index, payload.score
+	if type(index) ~= "number" or not table.find(slot.reviewItems, index) then
+		return
+	end
+	local points = rivalOf(tbl, slot).tasks[index].points
+	if type(score) ~= "number" or score % 1 ~= 0 or score < 0 or score > points then
+		return
+	end
+	slot.grades[index] = score
+end
+
+-- Игрок закончил проверку. Принимается, только когда оценены все работы.
+function handlers.reviewDone(tbl, slot)
+	if tbl.phase ~= "review" or slot.reviewDone then
+		return
+	end
+	for _, index in slot.reviewItems do
+		if slot.grades[index] == nil then
+			return
+		end
+	end
+	slot.reviewDone = true
+	if reviewFinished(tbl) then
+		conclude(tbl)
+	else
+		push(tbl)
 	end
 end
 
@@ -758,7 +1010,7 @@ local function onOccupantChanged(tbl, index: number)
 			push(tbl)
 		end
 	elseif slot then
-		if tbl.phase == "exam" or tbl.phase == "countdown" then
+		if tbl.phase == "exam" or tbl.phase == "countdown" or tbl.phase == "review" then
 			-- Во время матча место сохраняется за игроком, возвращаем его за парту.
 			task.delay(0.3, reseat, tbl, slot)
 		else
@@ -793,6 +1045,11 @@ local function onPlayerRemoving(player: Player)
 		if allDone(tbl) then
 			finish(tbl)
 		end
+	elseif tbl.phase == "review" then
+		-- Вышел во время взаимной проверки: матч заканчивается, непроверенные ответы соперника засчитываются полностью.
+		entryByPlayer[player] = nil
+		slot.left = true
+		conclude(tbl)
 	else
 		if tbl.phase == "countdown" then
 			tbl.matchId += 1 -- отменяет старт экзамена

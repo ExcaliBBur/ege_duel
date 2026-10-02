@@ -10,47 +10,57 @@ local SetupScreen = {}
 
 local C = Ui.colors
 
--- Ряд кнопок голосования. Возвращает рамку и функцию обновления (мой голос, голос соперника).
-local function voteRow(parent: Instance, y: number, title: string, options: { number }, suffix: string, onVote: (number) -> ())
-	Ui.caption(title, { Position = UDim2.fromOffset(20, y), Size = UDim2.fromOffset(700, 16), Parent = parent })
+-- Ряд кнопок голосования. options: список { value, label }. Возвращает функцию обновления
+-- (мой голос, голос соперника, новые подписи кнопок по значению).
+local function voteRow(parent: Instance, x: number, y: number, title: string, prefix: string, options, step: number, width: number, onVote: (any) -> ())
+	Ui.caption(title, { Position = UDim2.fromOffset(x, y), Size = UDim2.fromOffset(#options * step, 16), Parent = parent })
 	local buttons, marks = {}, {}
 	for index, option in options do
-		local x = 20 + (index - 1) * 142
-		local button = Ui.button(if option == 0 then "вся часть 1" else option .. suffix, "plain", {
-			Name = "Vote" .. option,
+		local value = option.value
+		local left = x + (index - 1) * step
+		local button = Ui.button(option.label, "plain", {
+			Name = prefix .. tostring(value),
 			TextSize = 15,
-			Position = UDim2.fromOffset(x, y + 22),
-			Size = UDim2.fromOffset(130, 40),
+			Position = UDim2.fromOffset(left, y + 22),
+			Size = UDim2.fromOffset(width, 40),
 			Parent = parent,
 		})
 		button.Activated:Connect(function()
-			onVote(option)
+			onVote(value)
 		end)
-		buttons[option] = button
-		marks[option] = Ui.label({
+		buttons[value] = button
+		marks[value] = Ui.label({
 			Text = "выбор соперника",
 			TextSize = 12,
 			Font = Ui.fonts.bold,
 			TextColor3 = C.rival,
 			TextXAlignment = Enum.TextXAlignment.Center,
-			Position = UDim2.fromOffset(x, y + 64),
-			Size = UDim2.fromOffset(130, 14),
+			Position = UDim2.fromOffset(left - 10, y + 64),
+			Size = UDim2.fromOffset(width + 20, 14),
 			Visible = false,
 			Parent = parent,
 		})
 	end
-	return function(mine: number, rivals: number, fullText: string?)
-		if fullText and buttons[0] then
-			buttons[0].Text = fullText
-		end
-		for option, button in buttons do
-			Ui.styleButton(button, if option == mine then "selected" else "plain")
-			marks[option].Visible = option == rivals
+	return function(mine: any, rivals: any, labels: { [any]: string }?)
+		for value, button in buttons do
+			if labels and labels[value] then
+				button.Text = labels[value]
+			end
+			Ui.styleButton(button, if value == mine then "selected" else "plain")
+			marks[value].Visible = value == rivals
 		end
 	end
 end
 
--- actions: setSubject(id), voteTime(n), voteCount(n), ready(bool), leave()
+local function numberOptions(values: { number }, suffix: string)
+	local options = {}
+	for _, value in values do
+		table.insert(options, { value = value, label = if value == 0 then "вся часть 1" else value .. suffix })
+	end
+	return options
+end
+
+-- actions: setSubject(id), voteTime(n), voteCount(n), votePart(bool), ready(bool), leave()
 function SetupScreen.create(parent: Instance, actions)
 	local screen = {}
 	local state = nil
@@ -128,13 +138,18 @@ function SetupScreen.create(parent: Instance, actions)
 		Parent = rivalPanel,
 	})
 
-	local updateTime = voteRow(frame, 312, "ВРЕМЯ НА РАБОТУ", Settings.timeOptions, " мин", actions.voteTime)
-	local updateCount = voteRow(frame, 402, "ЗАДАНИЯ: ВСЯ ПЕРВАЯ ЧАСТЬ ИЛИ СОКРАЩЁННЫЙ ВАРИАНТ ПО НОМЕРАМ", Settings.countOptions, "", actions.voteCount)
+	local updateTime = voteRow(frame, 20, 312, "ВРЕМЯ НА РАБОТУ, МИНУТ", "Vote", numberOptions(Settings.timeOptions, ""), 110, 102, actions.voteTime)
+	local updateCount = voteRow(frame, 20, 402, "ПЕРВАЯ ЧАСТЬ: ВСЯ ИЛИ СОКРАЩЁННАЯ ПО НОМЕРАМ", "Vote", numberOptions(Settings.countOptions, ""), 142, 130,
+		actions.voteCount)
+	-- Вторая часть: задания с развёрнутым ответом, которые после сдачи оценивает соперник.
+	local updatePart = voteRow(frame, 612, 402, "ВТОРАЯ ЧАСТЬ", "Part", { { value = false, label = "без неё" }, { value = true, label = "с ней" } }, 142, 130,
+		actions.votePart)
 
 	local status = Ui.label({
-		TextSize = 15,
-		Position = UDim2.fromOffset(20, 496),
-		Size = UDim2.new(1, -40, 0, 40),
+		TextSize = 14,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		Position = UDim2.fromOffset(20, 490),
+		Size = UDim2.new(1, -40, 0, 60),
 		Parent = frame,
 	})
 
@@ -179,18 +194,31 @@ function SetupScreen.create(parent: Instance, actions)
 		updateTime(me.time, rival.time)
 		-- У предмета с разбивкой по номерам показываем размер первой части.
 		local full = me.subject and state.fullCounts and state.fullCounts[me.subject] or 0
-		updateCount(me.count, rival.count, if full > 0 then string.format("вся часть 1 (%d)", full) else "вся часть 1")
+		updateCount(me.count, rival.count, { [0] = if full > 0 then string.format("вся часть 1 (%d)", full) else "вся часть 1" })
+		local second = me.subject and state.partTwoCounts and state.partTwoCounts[me.subject] or 0
+		updatePart(me.part, rival.part, { [true] = if second > 0 then string.format("с ней (%d)", second) else "с ней" })
 
 		local notes = {}
 		if me.subject and me.subject == rival.subject then
 			table.insert(notes, "Предмет одинаковый: вы получите один и тот же вариант.")
 		end
-		if me.time ~= rival.time and me.count ~= rival.count then
-			table.insert(notes, "Время и число заданий не совпали: их выберет жребий.")
-		elseif me.time ~= rival.time then
-			table.insert(notes, "Время не совпало: его выберет жребий.")
-		elseif me.count ~= rival.count then
-			table.insert(notes, "Число заданий не совпало: его выберет жребий.")
+		local differ = {}
+		if me.time ~= rival.time then
+			table.insert(differ, "время")
+		end
+		if me.count ~= rival.count then
+			table.insert(differ, "число заданий")
+		end
+		if me.part ~= rival.part then
+			table.insert(differ, "вторая часть")
+		end
+		if #differ > 0 then
+			table.insert(notes, "Голоса не совпали (" .. table.concat(differ, ", ") .. "): решит жребий.")
+		end
+		if me.part and me.subject and second == 0 then
+			table.insert(notes, "У вашего предмета второй части нет: вам достанется только первая.")
+		elseif me.part then
+			table.insert(notes, "Вторая часть: развёрнутые ответы после сдачи оценивает соперник по эталону и критериям.")
 		end
 		if not me.subject then
 			table.insert(notes, "Выберите предмет, чтобы нажать «Готов».")
@@ -198,7 +226,7 @@ function SetupScreen.create(parent: Instance, actions)
 			table.insert(notes, "Ждём, пока соперник нажмёт «Готов».")
 		end
 		status.Text = table.concat(notes, "\n")
-		status.TextColor3 = if me.time ~= rival.time or me.count ~= rival.count then C.warn else C.muted
+		status.TextColor3 = if #differ > 0 then C.warn else C.muted
 
 		if not me.subject then
 			readyButton.Text = "Готов"

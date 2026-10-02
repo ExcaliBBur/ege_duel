@@ -1,4 +1,5 @@
 -- Экран экзамена: задание с рисунком, поле ответа клетками как в бланке №1, навигатор, таймер, прогресс соперника.
+-- У заданий второй части с развёрнутым ответом вместо клеток большое поле для текста.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
@@ -17,8 +18,12 @@ local ExamScreen = {}
 
 local C = Ui.colors
 local CELLS = Settings.answerMaxChars
-local MAX_TASKS = 30 -- самая длинная первая часть: 28 заданий по химии
+local MAX_TASKS = 40 -- самый длинный вариант: первая и вторая части вместе
 local TASK_LABEL_HEIGHT = 4000 -- запас по высоте для текста задания, см. комментарий у TaskText
+local ESSAY_BOX_HEIGHT = 6000 -- то же для поля развёрнутого ответа
+local ESSAY_MAX = Settings.essayMaxChars
+local TASK_TOP = 174
+local TASK_HEIGHT, TASK_HEIGHT_ESSAY = 284, 136 -- высота области задания при кратком и при развёрнутом ответе
 
 local function serverNow(): number
 	return Workspace:GetServerTimeNow()
@@ -164,7 +169,7 @@ function ExamScreen.create(parent: Instance, actions)
 		Name = "MoreHint",
 		TextSize = 13,
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 0, 456),
+		Position = UDim2.new(0.5, 0, 0, TASK_TOP + TASK_HEIGHT - 2),
 		Size = UDim2.fromOffset(330, 22),
 		ZIndex = 5,
 		Visible = false,
@@ -190,8 +195,8 @@ function ExamScreen.create(parent: Instance, actions)
 	taskScroll:GetPropertyChangedSignal("CanvasPosition"):Connect(updateMoreHint)
 
 	-- Поле ответа: настоящий TextBox невидим и лежит поверх клеток, клетки показывают введённые символы.
-	Ui.caption("ОТВЕТ", { Position = UDim2.fromOffset(20, 466), Size = UDim2.fromOffset(100, 16), Parent = frame })
-	Ui.label({
+	local answerCaption = Ui.caption("ОТВЕТ", { Position = UDim2.fromOffset(20, 466), Size = UDim2.fromOffset(100, 16), Parent = frame })
+	local answerHint = Ui.label({
 		Text = "Без пробелов, как в бланке. В дробях точка сама заменяется на запятую.",
 		TextSize = 13,
 		TextColor3 = C.muted,
@@ -234,6 +239,66 @@ function ExamScreen.create(parent: Instance, actions)
 		ZIndex = 5,
 		Parent = cellRow,
 	})
+
+	-- Развёрнутый ответ второй части: большое поле вместо клеток. Поле заведомо высокое и лежит в прокручиваемой
+	-- области, высота холста считается по границам набранного текста.
+	local essayCaption = Ui.caption("РАЗВЁРНУТЫЙ ОТВЕТ: ПОСЛЕ СДАЧИ ЕГО ОЦЕНИТ СОПЕРНИК ПО ЭТАЛОНУ И КРИТЕРИЯМ", {
+		Position = UDim2.fromOffset(20, 318),
+		Size = UDim2.fromOffset(640, 16),
+		Visible = false,
+		Parent = frame,
+	})
+	local essayCounter = Ui.label({
+		Name = "EssayCounter",
+		TextSize = 13,
+		TextColor3 = C.muted,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		Position = UDim2.new(1, -240, 0, 318),
+		Size = UDim2.fromOffset(220, 16),
+		Visible = false,
+		Parent = frame,
+	})
+	local essayScroll = Ui.new("ScrollingFrame", {
+		Name = "EssayScroll",
+		Position = UDim2.fromOffset(20, 338),
+		Size = UDim2.new(1, -40, 0, 204),
+		BackgroundColor3 = C.surface,
+		BorderSizePixel = 0,
+		ScrollBarThickness = 6,
+		ScrollBarImageColor3 = C.muted,
+		CanvasSize = UDim2.new(),
+		ScrollingDirection = Enum.ScrollingDirection.Y,
+		Visible = false,
+		Parent = frame,
+	}, { Ui.corner(6), Ui.stroke(C.line, 1.5) })
+	local essayBox = Ui.new("TextBox", {
+		Name = "EssayBox",
+		Position = UDim2.fromOffset(10, 8),
+		Size = UDim2.new(1, -28, 0, ESSAY_BOX_HEIGHT),
+		BackgroundTransparency = 1,
+		Font = Ui.fonts.regular,
+		TextSize = 16,
+		LineHeight = 1.1,
+		TextColor3 = C.ink,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		TextWrapped = true,
+		MultiLine = true,
+		ClearTextOnFocus = false,
+		Text = "",
+		PlaceholderText = "Напишите решение и ответ. Формулы записывайте в строку, например: x^2 - 5x + 6 = 0, x1 = 2, x2 = 3.",
+		PlaceholderColor3 = C.muted,
+		Parent = essayScroll,
+	})
+	local function fitEssay()
+		local scale = essayBox.AbsoluteSize.Y / ESSAY_BOX_HEIGHT
+		if scale > 0 then
+			local height = math.max(204, math.ceil(essayBox.TextBounds.Y / scale) + 40)
+			if essayScroll.CanvasSize.Y.Offset ~= height then
+				essayScroll.CanvasSize = UDim2.fromOffset(0, height)
+			end
+		end
+	end
 
 	-- Нижний ряд: отметка и переход к заданию без ответа.
 	local flagButton = Ui.button("Отметить", "plain", {
@@ -343,6 +408,29 @@ function ExamScreen.create(parent: Instance, actions)
 		return answer ~= nil and Text.normalize(answer) ~= ""
 	end
 
+	local function isEssay(index: number): boolean
+		return tasks[index] ~= nil and tasks[index].essay == true
+	end
+
+	-- Переключает раскладку: клетки для краткого ответа или большое поле для развёрнутого.
+	local function applyLayout(essay: boolean)
+		local height = if essay then TASK_HEIGHT_ESSAY else TASK_HEIGHT
+		taskScroll.Size = UDim2.new(1, -144, 0, height)
+		prevButton.Size = UDim2.fromOffset(40, height)
+		nextButton.Size = UDim2.fromOffset(40, height)
+		moreHint.Position = UDim2.new(0.5, 0, 0, TASK_TOP + height - 2)
+		answerCaption.Visible = not essay
+		answerHint.Visible = not essay
+		cellRow.Visible = not essay
+		essayCaption.Visible = essay
+		essayCounter.Visible = essay
+		essayScroll.Visible = essay
+	end
+
+	local function renderCounter()
+		essayCounter.Text = string.format("%d из %d знаков", utf8.len(essayBox.Text) or #essayBox.Text, ESSAY_MAX)
+	end
+
 	local function isLocked(): boolean
 		return submitted or timeUp
 	end
@@ -377,8 +465,8 @@ function ExamScreen.create(parent: Instance, actions)
 		for index, button in navButtons do
 			local task = tasks[index]
 			button.Position = UDim2.fromOffset(20 + (index - 1) * step, 112)
-			button.Size = UDim2.fromOffset(step - 6, 34)
-			button.TextSize = if step < 36 then 13 else 16
+			button.Size = UDim2.fromOffset(step - (if step < 28 then 3 else 6), 34)
+			button.TextSize = if step < 28 then 11 elseif step < 36 then 13 else 16
 			button.Text = if task then tostring(task.number or index) else ""
 		end
 	end
@@ -417,8 +505,11 @@ function ExamScreen.create(parent: Instance, actions)
 		else
 			titleLabel.Text = string.format("%s · задание %d из %d", subjectName, current, #tasks)
 		end
-		local pointsText = if task.points >= 2 then task.points .. " БАЛЛА" else "1 БАЛЛ"
-		pointsLabel.Text = if task.topic then string.upper(pointsText) .. " · " .. task.topic else pointsText
+		local pointsText = task.points .. " " .. Ui.plural(task.points, "БАЛЛ", "БАЛЛА", "БАЛЛОВ")
+		if task.part == 2 then
+			pointsText = "ЧАСТЬ 2 · " .. pointsText
+		end
+		pointsLabel.Text = if task.topic then pointsText .. " · " .. task.topic else pointsText
 		taskLabel.Text = task.text
 		-- Длинные задания набираются мельче, чтобы варианты ответа были видны без прокрутки.
 		local length = utf8.len(task.text) or #task.text
@@ -439,8 +530,16 @@ function ExamScreen.create(parent: Instance, actions)
 		taskScroll.CanvasPosition = Vector2.zero
 		flagButton.Text = if flags[current] then "Снять отметку" else "Отметить"
 
+		local essay = task.essay == true
+		applyLayout(essay)
 		settingText = true
-		input.Text = answers[current] or ""
+		if essay then
+			essayBox.Text = answers[current] or ""
+			essayScroll.CanvasPosition = Vector2.zero
+			renderCounter()
+		else
+			input.Text = answers[current] or ""
+		end
 		settingText = false
 		renderCells()
 		renderNav()
@@ -459,7 +558,11 @@ function ExamScreen.create(parent: Instance, actions)
 		if keepTyping then
 			task.defer(function()
 				if frame.Visible and not isLocked() and not confirmShade.Visible then
-					input:CaptureFocus()
+					if isEssay(current) then
+						essayBox:CaptureFocus()
+					else
+						input:CaptureFocus()
+					end
 				end
 			end)
 		end
@@ -479,6 +582,8 @@ function ExamScreen.create(parent: Instance, actions)
 		flush()
 		input:ReleaseFocus()
 		input.TextEditable = false
+		essayBox:ReleaseFocus()
+		essayBox.TextEditable = false
 		confirmShade.Visible = false
 		reference.close()
 		doneText.Text = text
@@ -510,6 +615,34 @@ function ExamScreen.create(parent: Instance, actions)
 			end
 		end)
 	end)
+	essayBox:GetPropertyChangedSignal("Text"):Connect(function()
+		if settingText or isLocked() or not isEssay(current) then
+			return
+		end
+		local cleaned = Text.truncate((string.gsub(essayBox.Text, "\r", "")), ESSAY_MAX)
+		if cleaned ~= essayBox.Text then
+			essayBox.Text = cleaned
+			return
+		end
+		answers[current] = cleaned
+		renderCounter()
+		renderNav()
+		fitEssay()
+		-- Пока текст дописывают в конец, поле прокручивается вслед за курсором.
+		if essayBox.CursorPosition > #cleaned - 2 then
+			essayScroll.CanvasPosition = Vector2.new(0, math.max(0, essayScroll.CanvasSize.Y.Offset))
+		end
+
+		pending = { index = current, value = cleaned }
+		sendToken += 1
+		local token = sendToken
+		task.delay(1, function() -- длинный текст отправляется реже, чем краткий ответ
+			if token == sendToken then
+				flush()
+			end
+		end)
+	end)
+	essayBox.FocusLost:Connect(flush)
 	input.Focused:Connect(renderCells)
 	input.FocusLost:Connect(function(enterPressed: boolean)
 		flush()
@@ -564,7 +697,10 @@ function ExamScreen.create(parent: Instance, actions)
 			end
 			return
 		end
-		local typing = input:IsFocused()
+		local typing = input:IsFocused() or essayBox:IsFocused()
+		if key == Enum.KeyCode.Tab and essayBox:IsFocused() then
+			return -- в большом поле Tab остаётся обычным знаком
+		end
 		if key == Enum.KeyCode.PageDown or key == Enum.KeyCode.Tab then
 			goTo(current + 1, typing)
 		elseif key == Enum.KeyCode.PageUp then
@@ -582,6 +718,7 @@ function ExamScreen.create(parent: Instance, actions)
 		end
 		flush()
 		input:ReleaseFocus()
+		essayBox:ReleaseFocus()
 		local answered, flagged = 0, 0
 		for index = 1, #tasks do
 			if isAnswered(index) then
@@ -647,6 +784,7 @@ function ExamScreen.create(parent: Instance, actions)
 
 		hintLabel.Text = "Enter или Tab: следующее\nPageUp, PageDown: листать"
 		input.TextEditable = true
+		essayBox.TextEditable = true
 		confirmShade.Visible = false
 		doneCover.Visible = false
 		layoutNav()
@@ -657,6 +795,7 @@ function ExamScreen.create(parent: Instance, actions)
 	function screen.hide()
 		frame.Visible = false
 		input:ReleaseFocus()
+		essayBox:ReleaseFocus()
 		-- Скрытый экран не держит лишних объектов: рисунок и справочные материалы удаляются.
 		reference.close()
 		if figureFrame then
@@ -672,6 +811,9 @@ function ExamScreen.create(parent: Instance, actions)
 		local remaining = endsAt - serverNow()
 		timerLabel.Text = Ui.clock(remaining)
 		updateMoreHint()
+		if essayScroll.Visible then
+			fitEssay()
+		end
 
 		-- Жёлтый за 5 минут до конца (за 2 минуты в коротком матче), красный за минуту.
 		local warnAt = if duration > 600 then 300 else 120

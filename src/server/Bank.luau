@@ -11,7 +11,9 @@ local Bank = {}
 
 local tasksBySubject: { [string]: { any } } = {}
 
-local VALID_KINDS = { exact = true, number = true, set = true, order = true }
+local VALID_KINDS = { exact = true, number = true, set = true, order = true, essay = true }
+local MAX_POINTS = 25 -- сочинение по русскому языку оценивается в 22 балла
+local MAX_CRITERIA = 12
 
 local FIGURE_FIELDS = { line = 6, rect = 6, circle = 5, text = 5 } -- вид фигуры и число полей
 local FIGURE_MAX_ITEMS = 240
@@ -41,6 +43,20 @@ local function sanitizeFigure(raw: any): any
 	return { w = math.clamp(raw.w, 50, 800), h = math.clamp(raw.h, 50, 600), items = items }
 end
 
+-- Критерии оценивания развёрнутого ответа: список строк.
+local function sanitizeCriteria(raw: any): { string }?
+	if type(raw) ~= "table" then
+		return nil
+	end
+	local criteria = {}
+	for _, line in raw do
+		if type(line) == "string" and line ~= "" and #criteria < MAX_CRITERIA then
+			table.insert(criteria, line)
+		end
+	end
+	return if #criteria > 0 then criteria else nil
+end
+
 -- Оставляет только корректные задания, чтобы битый файл из интернета не сломал матч.
 local function sanitize(rawTasks: any): { any }
 	local result = {}
@@ -55,9 +71,13 @@ local function sanitize(rawTasks: any): { any }
 					table.insert(answers, answer)
 				end
 			end
-			local points = if raw.points == 2 or raw.points == 3 then raw.points else 1
+			local points = if type(raw.points) == "number" and raw.points % 1 == 0 and raw.points >= 1 and raw.points <= MAX_POINTS
+				then raw.points
+				else 1
 			local kind = if VALID_KINDS[raw.kind] then raw.kind else "exact"
-			if #answers > 0 then
+			local criteria = sanitizeCriteria(raw.criteria)
+			-- Развёрнутый ответ без критериев сопернику оценить нечем, такое задание отбрасывается.
+			if #answers > 0 and (kind ~= "essay" or criteria) then
 				table.insert(result, {
 					id = tostring(raw.id or #result + 1),
 					group = if type(raw.group) == "string" then raw.group else nil,
@@ -72,6 +92,9 @@ local function sanitize(rawTasks: any): { any }
 					topic = if type(raw.topic) == "string" then raw.topic else nil,
 					-- Общий текст для нескольких заданий, например "reading:2": такие задания вариант берёт вместе.
 					context = if type(raw.context) == "string" then raw.context else nil,
+					-- Вторая часть экзамена и критерии оценивания развёрнутого ответа.
+					part = if raw.part == 2 then 2 else nil,
+					criteria = criteria,
 				})
 			end
 		end
@@ -173,7 +196,19 @@ end
 function Bank.fullCount(subjectId: string): number
 	local seen, count = {}, 0
 	for _, task in Bank.getTasks(subjectId) do
-		if task.number and not seen[task.number] then
+		if task.number and task.part ~= 2 and not seen[task.number] then
+			seen[task.number] = true
+			count += 1
+		end
+	end
+	return count
+end
+
+-- Сколько номеров во второй части предмета. Ноль означает, что второй части в банке нет.
+function Bank.partTwoCount(subjectId: string): number
+	local seen, count = {}, 0
+	for _, task in Bank.getTasks(subjectId) do
+		if task.number and task.part == 2 and not seen[task.number] then
 			seen[task.number] = true
 			count += 1
 		end
@@ -186,7 +221,8 @@ function Bank.randomTextTask()
 	local candidates = {}
 	for _, subject in Subjects.list do
 		for _, task in Bank.getTasks(subject.id) do
-			if not task.figure then
+			-- Доске нужны короткие задания с однозначным ответом.
+			if not task.figure and task.kind ~= "essay" and task.part ~= 2 and not task.context and #task.text < 600 then
 				table.insert(candidates, { subject = subject.name, task = task })
 			end
 		end

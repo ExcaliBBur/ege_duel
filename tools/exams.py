@@ -1,6 +1,8 @@
 """Предметы, банк которых разбит по номерам заданий ЕГЭ.
 
 EXAMS: предмет -> список номеров первой части (Entry). Вариант в игре собирается по этим номерам.
+PART_TWO: предмет -> список номеров второй части. Расчётные задачи с числом в ответе проверяются
+автоматически, развёрнутые ответы (kind = "essay") оценивает соперник по эталону и критериям.
 PART_ONE: сколько номеров в первой части экзамена 2026 года.
 SKIPPED: номера первой части, которые нельзя перенести в игру, и причина.
 """
@@ -17,6 +19,12 @@ import exam_math_prof
 import exam_physics
 import exam_russian
 import exam_social
+import part2_biology
+import part2_chemistry
+import part2_humanities
+import part2_languages
+import part2_math
+import part2_physics
 
 EXAMS = {
     "russian": exam_russian.NUMBERS,
@@ -32,6 +40,21 @@ EXAMS = {
     "literature": exam_literature.NUMBERS,
     "english": exam_english.NUMBERS,
 }
+
+# Вторая часть. У базовой математики её нет, у информатики вся работа выполняется на компьютере.
+PART_TWO = {
+    "russian": part2_languages.RUSSIAN,
+    "math_prof": part2_math.NUMBERS,
+    "physics": part2_physics.NUMBERS,
+    "chemistry": part2_chemistry.NUMBERS,
+    "biology": part2_biology.NUMBERS,
+    "history": part2_humanities.HISTORY,
+    "social": part2_humanities.SOCIAL,
+    "geography": part2_humanities.GEOGRAPHY,
+    "literature": part2_languages.LITERATURE,
+    "english": part2_languages.ENGLISH,
+}
+PART_TWO_MINIMUM = 3  # столько разных заданий должно быть на каждый номер второй части
 
 # Сколько разных заданий должно набираться на каждый номер. В предметах с вычисляемыми заданиями это 20,
 # а там, где задания привязаны к авторским текстам, их меньше.

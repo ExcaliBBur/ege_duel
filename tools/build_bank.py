@@ -30,8 +30,10 @@ SUBJECTS = [
     "russian", "math_base", "math_prof", "physics", "chemistry", "biology",
     "informatics", "history", "social", "geography", "literature", "english",
 ]
-KINDS = {"exact", "number", "set", "order"}
+KINDS = {"exact", "number", "set", "order", "essay"}
 ANSWER_MAX_CHARS = 17  # как Settings.answerMaxChars в игре
+PART_TWO_MAX_POINTS = 25  # как MAX_POINTS в Bank.luau
+MAX_CRITERIA = 12  # как MAX_CRITERIA в Bank.luau
 
 
 def normalize(text: str) -> str:
@@ -62,10 +64,27 @@ def check(subject: str, item: dict) -> list[str]:
     kind = item.get("kind")
     if kind not in KINDS:
         errors.append(f"неизвестный вид проверки {kind!r}")
-    if item.get("points") not in (1, 2, 3):
+    if item.get("part") == 2:
+        if item.get("points") not in range(1, PART_TWO_MAX_POINTS + 1):
+            errors.append(f"баллы второй части должны быть от 1 до {PART_TWO_MAX_POINTS}")
+    elif item.get("points") not in (1, 2, 3):
         errors.append("баллы должны быть от 1 до 3")
     if not isinstance(item.get("explanation"), str) or not item["explanation"].strip():
         errors.append("нет пояснения")
+    if kind == "essay":
+        # Развёрнутый ответ оценивает соперник: ему нужны эталон (пояснение) и критерии.
+        criteria = item.get("criteria")
+        if item.get("part") != 2:
+            errors.append("развёрнутый ответ бывает только во второй части")
+        if not isinstance(criteria, list) or not 1 <= len(criteria) <= MAX_CRITERIA:
+            errors.append(f"критериев должно быть от 1 до {MAX_CRITERIA}")
+        elif not all(isinstance(line, str) and line.strip() for line in criteria):
+            errors.append("пустой критерий")
+        if "figure" in item:
+            errors.append("у задания с развёрнутым ответом не должно быть рисунка: экран проверки его не показывает")
+        answers = []
+    elif "criteria" in item:
+        errors.append("критерии нужны только заданиям с развёрнутым ответом")
     for answer in answers:
         if not isinstance(answer, str) or not normalize(answer):
             errors.append("пустой ответ")
@@ -168,13 +187,14 @@ def generate(subject: str, rng: random.Random, per_generator: int, taken: set[st
     return tasks
 
 
-def generate_numbered(subject: str, rng: random.Random, per_number: int) -> list[dict]:
+def generate_numbered(subject: str, rng: random.Random, per_number: int, part: int = 1) -> list[dict]:
     """Задания предмета, разбитого по номерам ЕГЭ: на каждый номер per_number заданий.
 
     Генераторы одного номера вызываются по очереди, чтобы разные подтипы встречались поровну.
+    part = 2 даёт задания второй части (с развёрнутым ответом), у них есть поле part.
     """
     tasks = []
-    for entry in exams.EXAMS[subject]:
+    for entry in (exams.EXAMS[subject] if part == 1 else exams.PART_TWO.get(subject, [])):
         seen = set()
         attempts = 0
         made_count = 0
@@ -202,6 +222,10 @@ def generate_numbered(subject: str, rng: random.Random, per_number: int) -> list
                 tasks[-1]["figure"] = made["figure"]
             if "context" in made:
                 tasks[-1]["context"] = made["context"]
+            if part == 2:
+                tasks[-1]["part"] = 2
+            if "criteria" in made:
+                tasks[-1]["criteria"] = made["criteria"]
     return tasks
 
 
@@ -235,6 +259,8 @@ def build(seed: int, per_generator: int, per_number: int = 20) -> int:
     for subject in SUBJECTS:
         if subject in exams.EXAMS:
             tasks = generate_numbered(subject, rng, per_number)
+            # У второй части свой генератор случайных чисел: её правки не меняют задания первой части.
+            tasks += generate_numbered(subject, random.Random(seed * 1000 + SUBJECTS.index(subject)), per_number, part=2)
         else:
             authored = load_authored(subject)
             tasks = authored + generate(subject, rng, per_generator, {identity(item) for item in authored})
@@ -251,7 +277,8 @@ def build(seed: int, per_generator: int, per_number: int = 20) -> int:
         ordered = [
             {
                 key: item[key]
-                for key in ("id", "group", "number", "topic", "context", "text", "answers", "points", "kind", "explanation", "figure")
+                for key in ("id", "group", "number", "part", "topic", "context", "text", "answers", "points", "kind", "explanation",
+                            "criteria", "figure")
                 if key in item
             }
             for item in tasks

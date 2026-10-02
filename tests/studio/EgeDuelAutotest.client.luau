@@ -321,9 +321,10 @@ local function run()
 	local setup = gui:FindFirstChild("Setup", true)
 	local exam = gui:FindFirstChild("Exam", true)
 	local results = gui:FindFirstChild("Results", true)
+	local review = gui:FindFirstChild("Review", true)
 	local countdown = gui:FindFirstChild("Countdown", true)
-	check("экраны созданы", setup and exam and results and countdown)
-	if not (setup and exam and results and countdown) then
+	check("экраны созданы", setup and exam and results and review and countdown)
+	if not (setup and exam and results and review and countdown) then
 		return
 	end
 
@@ -361,6 +362,8 @@ local function run()
 	action:FireServer("voteCount", 0)
 	task.wait(1)
 	check("в настройке есть вариант «вся часть 1» с числом номеров", findText(setup, "вся часть 1 %(21%)") ~= nil)
+	check("в настройке есть голосование за вторую часть", setup:FindFirstChild("Parttrue", true) and setup:FindFirstChild("Partfalse", true))
+	check("время на работу до 180 минут", setup:FindFirstChild("Vote180", true) ~= nil)
 	check("кнопка «Готов» на экране настройки", findText(setup, "^Готов$") ~= nil)
 	mark("экран настройки")
 	hold()
@@ -461,23 +464,64 @@ local function run()
 	waitFor("реванш: снова экран настройки, предмет можно сменить", function()
 		return setup.Visible
 	end, 5)
+	-- Реванш со второй частью: развёрнутые ответы и взаимная проверка.
 	action:FireServer("setSubject", "chemistry")
-	task.wait(0.5)
+	action:FireServer("voteCount", 8)
+	action:FireServer("votePart", true)
+	task.wait(1)
+	check("вторая часть: в настройке указано число её номеров", findText(setup, "с ней %(6%)") ~= nil)
+	check("вторая часть: пояснение о проверке соперником", findText(setup, "оценивает соперник") ~= nil)
+	hold()
 	action:FireServer("ready", true)
 	waitFor("реванш: отсчёт", function()
 		return countdown.Visible
 	end, 5)
 	check("реванш: выбран новый предмет", findText(countdown, "Химия") ~= nil)
+	check("реванш: в отсчёте сказано про вторую часть", findText(countdown, "вторая часть есть") ~= nil)
 	waitFor("реванш: экзамен", function()
 		return exam.Visible
 	end, 10)
 	task.wait(1)
 	check("у химии есть кнопка справочных материалов", exam.ReferenceButton.Visible)
+	check("вторая часть: 8 номеров первой части и 6 второй", exam:FindFirstChild("Nav14") and exam.Nav14.Visible and not exam.Nav15.Visible)
+	check("вторая часть: поле развёрнутого ответа создано и скрыто у краткого задания", exam:FindFirstChild("EssayScroll") and not exam.EssayScroll.Visible)
 	mark("реванш, экзамен")
+	-- Номера 29-33 требуют развёрнутого ответа: отвечаем на первые два, остальные оставляем пустыми.
+	action:FireServer("answer", { index = 9, value = "2KMnO4 + Na2SO3 + 2KOH = 2K2MnO4 + Na2SO4 + H2O.\nОкислитель: перманганат калия." })
+	action:FireServer("answer", { index = 10, value = "Ba2+ + SO4 2- = BaSO4" })
+	task.wait(0.5)
 	action:FireServer("submit")
-	waitFor("реванш: итоги", function()
-		return results.Visible
+	if not waitFor("вторая часть: открылся экран взаимной проверки", function()
+		return review.Visible
+	end, 10) then
+		return
+	end
+	task.wait(1)
+	check("проверка: в шапке имя соперника", findText(review, "Проверка работы: Тестовый соперник") ~= nil)
+	check("проверка: пять ответов соперника", findText(review, "^Ответ 1 из 5 · задание № 29") ~= nil)
+	check("проверка: показан ответ соперника", findText(review, "Тестовый развёрнутый ответ соперника на задание №29") ~= nil)
+	check("проверка: показаны эталон и критерии", findText(review, "Критерии:") ~= nil and findText(review, "2 балла:") ~= nil)
+	check("проверка: кнопки оценок от 0 до 2", review.Score2.Visible and not review.Score3.Visible)
+	check("проверка: таймер идёт", findText(review, "^%d%d:%d%d$") ~= nil)
+	check("проверка: завершить нельзя, пока не все оценки выставлены", findText(review, "Оценено 0 из 5") ~= nil)
+	mark("взаимная проверка")
+	hold(5)
+	action:FireServer("reviewDone") -- без оценок сервер не принимает
+	task.wait(0.5)
+	check("проверка: сервер не завершил её без оценок", review.Visible)
+	for index = 9, 13 do
+		action:FireServer("grade", { index = index, score = 1 })
+	end
+	action:FireServer("reviewDone")
+	waitFor("реванш: итоги после проверки", function()
+		return results.Visible and not review.Visible
 	end, 10)
+	task.wait(1)
+	check("итоги: оценка соперника за развёрнутый ответ", findText(results, "№ 29 · 1 из 2 · оценку поставил соперник") ~= nil)
+	check("итоги: показан свой развёрнутый ответ", findText(results, "Ваш ответ: 2KMnO4") ~= nil)
+	check("итоги: пустой развёрнутый ответ даёт 0", findText(results, "№ 31 · 0 из 4 · развёрнутого ответа нет") ~= nil)
+	check("итоги: критерии в разборе", findText(results, "^Критерии: ") ~= nil)
+	hold(5)
 
 	action:FireServer("leave")
 	waitFor("после «Встать» экраны закрыты", function()
@@ -546,7 +590,125 @@ local function showSamples()
 	preview.hide()
 end
 
+-- Экран экзамена с заданием второй части: большое поле вместо клеток.
+local function checkEssayField()
+	local gui = player.PlayerGui:FindFirstChild("EgeDuel")
+	local panel = gui and gui:FindFirstChild("Exam", true) and gui:FindFirstChild("Exam", true).Parent
+	local module = player.PlayerScripts:FindFirstChild("ExamScreen", true)
+	if not panel or not module then
+		check("поле развёрнутого ответа: экран найден", false)
+		return
+	end
+	local sent = {}
+	local preview = require(module).create(panel, {
+		answer = function(index, value)
+			sent[index] = value
+		end,
+		submit = function() end,
+	})
+	local frames = {}
+	for _, child in panel:GetChildren() do
+		if child.Name == "Exam" then
+			table.insert(frames, child)
+		end
+	end
+	local frame = frames[#frames]
+	local now = Workspace:GetServerTimeNow()
+	local essay = {
+		text = "Какое значение имеет листопад в жизни растений умеренных широт? Укажите не менее трёх значений.",
+		points = 3,
+		number = 25,
+		topic = "Обобщение и применение знаний",
+		part = 2,
+		essay = true,
+	}
+	preview.show({
+		subject = "biology",
+		startedAt = now,
+		endsAt = now + 900,
+		tasks = { essay, { text = "Сколько будет 2 + 2?", points = 1, number = 1 } },
+		rival = { name = "Образец", subject = "biology", answered = 0, total = 2, submitted = false, left = false },
+	})
+	task.wait(0.5)
+	local box = frame.EssayScroll.EssayBox
+	check("развёрнутый ответ: большое поле показано вместо клеток", frame.EssayScroll.Visible and frame.EssayCounter.Visible)
+	check("развёрнутый ответ: в подписи вторая часть и баллы", findText(frame, "ЧАСТЬ 2 · 3 БАЛЛА") ~= nil)
+	box.Text = string.rep("Листья испаряют воду, а зимой корни не могут её всасывать.\n", 30)
+	task.wait(1.5)
+	check("развёрнутый ответ: счётчик знаков", findText(frame, "^%d+ из 3000 знаков$") ~= nil)
+	check("развёрнутый ответ: длинный текст прокручивается", frame.EssayScroll.AbsoluteCanvasSize.Y > frame.EssayScroll.AbsoluteWindowSize.Y + 8)
+	check("развёрнутый ответ: текст отправлен на сервер с точками и переносами", sent[1] ~= nil and string.find(sent[1], "всасывать%.\n") ~= nil)
+	box.Text = string.rep("я", 3500)
+	task.wait(0.3)
+	check("развёрнутый ответ: обрезан до 3000 знаков", utf8.len(box.Text) == 3000)
+	box.Text = "Листья испаряют воду, а зимой корни не могут всасывать её из холодной почвы.\nС листьями удаляются вредные продукты обмена."
+	hold(4)
+	preview.hide()
+	frame:Destroy()
+end
+
+-- Режим снимков: экран настройки с голосованием за вторую часть и экран взаимной проверки с образцом.
+local function showPartTwoScreens()
+	if HOLD == 0 then
+		return
+	end
+	local gui = player.PlayerGui:FindFirstChild("EgeDuel")
+	local panel = gui and gui:FindFirstChild("Exam", true) and gui:FindFirstChild("Exam", true).Parent
+	local setupModule = player.PlayerScripts:FindFirstChild("SetupScreen", true)
+	local reviewModule = player.PlayerScripts:FindFirstChild("ReviewScreen", true)
+	if not panel or not setupModule or not reviewModule then
+		return
+	end
+	local noop = function() end
+	local setupPreview = require(setupModule).create(panel, { setSubject = noop, voteTime = noop, voteCount = noop, votePart = noop, ready = noop, leave = noop })
+	setupPreview.show({
+		counts = { biology = 432, math_base = 420 },
+		fullCounts = { biology = 21, math_base = 21 },
+		partTwoCounts = { biology = 6, math_base = 0 },
+		me = { subject = "biology", time = 120, count = 0, part = true, ready = false },
+		rival = { name = "Образец", subject = "math_base", time = 60, count = 0, part = false, ready = true },
+	})
+	task.wait(4)
+	setupPreview.hide()
+
+	local reviewPreview = require(reviewModule).create(panel, { grade = noop, done = noop })
+	reviewPreview.show({
+		endsAt = Workspace:GetServerTimeNow() + 330,
+		rivalName = "Образец",
+		done = false,
+		rivalDone = false,
+		waitingForMe = 2,
+		items = {
+			{
+				index = 9,
+				number = 25,
+				topic = "Обобщение и применение знаний",
+				points = 3,
+				text = "Какое значение имеет листопад в жизни растений умеренных широт? Укажите не менее трёх значений.",
+				answer = "Листья испаряют воду, а зимой корни не могут всасывать её из холодной почвы.\nС листьями удаляются вредные продукты обмена.",
+				solution = "1) Уменьшается испарение воды зимой, когда корни не могут всасывать её из холодной почвы. "
+					.. "2) С листьями удаляются накопившиеся ненужные и вредные продукты обмена. 3) Ветви без листьев меньше ломаются под тяжестью снега.",
+				criteria = {
+					"3 балла: ответ включает все элементы эталона и не содержит биологических ошибок.",
+					"2 балла: в ответе на один элемент меньше, чем в эталоне.",
+					"1 балл: верно приведён только один элемент ответа.",
+					"0 баллов: ответ неверный.",
+				},
+				score = 2,
+			},
+			{ index = 10, number = 26, points = 3, text = "Второе задание", answer = "Ответ", solution = "Эталон", criteria = { "3 балла: всё верно." } },
+		},
+	})
+	task.wait(5)
+	reviewPreview.hide()
+end
+
 local ok, message = pcall(run)
+pcall(showPartTwoScreens)
+local essayOk, essayMessage = pcall(checkEssayField)
+if not essayOk then
+	table.insert(lines, "FAIL проверка поля развёрнутого ответа упала: " .. tostring(essayMessage))
+end
 pcall(showSamples)
 if not ok then
 	table.insert(lines, "FAIL сценарий упал: " .. tostring(message))

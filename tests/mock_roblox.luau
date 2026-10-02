@@ -115,6 +115,22 @@ function ReplicatedStorage:WaitForChild()
 	return dummy
 end
 
+-- Фильтр текста. Тест может выключить его (fail = true), чтобы проверить случай, когда сервис недоступен.
+-- Слово «плохо» фильтр заменяет решётками, как настоящий.
+local TextService = { fail = false, calls = 0 }
+function TextService:FilterStringAsync(text, userId)
+	self.calls += 1
+	if self.fail then
+		error("фильтр недоступен")
+	end
+	assert(type(userId) == "number", "фильтру нужен номер автора")
+	return {
+		GetNonChatStringForBroadcastAsync = function()
+			return (string.gsub(text, "плохо", "#####"))
+		end,
+	}
+end
+
 local game = {}
 function game:GetService(name)
 	if name == "Players" then
@@ -123,6 +139,8 @@ function game:GetService(name)
 		return Workspace
 	elseif name == "RunService" then
 		return RunService
+	elseif name == "TextService" then
+		return TextService
 	end
 	return ReplicatedStorage
 end
@@ -226,7 +244,17 @@ end
 function mockBank.fullCount(subjectId)
 	local seen, count = {}, 0
 	for _, task in mockBank.getTasks(subjectId) do
-		if task.number and not seen[task.number] then
+		if task.number and task.part ~= 2 and not seen[task.number] then
+			seen[task.number] = true
+			count += 1
+		end
+	end
+	return count
+end
+function mockBank.partTwoCount(subjectId)
+	local seen, count = {}, 0
+	for _, task in mockBank.getTasks(subjectId) do
+		if task.number and task.part == 2 and not seen[task.number] then
 			seen[task.number] = true
 			count += 1
 		end

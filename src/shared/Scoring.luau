@@ -64,6 +64,9 @@ function Scoring.grade(task, rawAnswer: string?): number
 		return 0
 	end
 	local kind = task.kind or "exact"
+	if kind == "essay" then
+		return 0 -- развёрнутый ответ оценивает соперник, см. Scoring.summarize
+	end
 	local points = task.points or 1
 	local best = 0
 	for _, accepted in task.answers do
@@ -91,7 +94,9 @@ function Scoring.grade(task, rawAnswer: string?): number
 end
 
 -- Итог по работе: баллы, число верных и частично верных ответов.
-function Scoring.summarize(tasks, answers)
+-- given: оценки соперника за развёрнутые ответы, [номер задания в варианте] = балл.
+-- Значение false означает, что ответ не удалось показать сопернику: такое задание в счёт не идёт.
+function Scoring.summarize(tasks, answers, given)
 	local summary = {
 		earned = 0,
 		max = 0,
@@ -100,11 +105,26 @@ function Scoring.summarize(tasks, answers)
 		answered = 0,
 		total = #tasks,
 		perTask = {},
+		void = {},
 	}
 	for index, task in tasks do
 		local points = task.points or 1
 		local answer = answers[index]
-		local earned = Scoring.grade(task, answer)
+		local earned
+		if task.kind == "essay" then
+			local score = given and given[index]
+			if score == false then
+				summary.perTask[index] = 0
+				summary.void[index] = true
+				if answer ~= nil and Text.normalize(answer) ~= "" then
+					summary.answered += 1
+				end
+				continue
+			end
+			earned = if type(score) == "number" then math.clamp(math.floor(score), 0, points) else 0
+		else
+			earned = Scoring.grade(task, answer)
+		end
 		summary.max += points
 		summary.earned += earned
 		summary.perTask[index] = earned

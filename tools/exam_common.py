@@ -160,6 +160,33 @@ def table_figure(rows, cell_width=62, cell_height=34, first_width=120):
 # ---------------------------------------------------------------- виды заданий, общие для предметов
 
 
+def essay(text, solution, criteria):
+    """Задание второй части с развёрнутым ответом: его оценивает соперник по эталону и критериям."""
+    return {"text": text, "answer": "-", "explanation": solution, "criteria": list(criteria), "kind": "essay"}
+
+
+def levels(*lines):
+    """Критерии по убыванию балла: levels("всё верно", "одна ошибка") -> «2 балла: …», «1 балл: …», «0 баллов: …»."""
+    top = len(lines)
+    made = []
+    for offset, line in enumerate(lines):
+        score = top - offset
+        word = "балл" if score == 1 else "балла" if score < 5 else "баллов"
+        made.append(f"{score} {word}: {line}")
+    return made + ["0 баллов: ответ неверный или не по существу задания."]
+
+
+def essays(name, items):
+    """Генератор по готовому списку заданий: каждое задание попадает в банк один раз."""
+    def generator(r):
+        index = r.randrange(len(items))
+        made = dict(items[index])
+        made["key"] = f"{name}:{index}"
+        return made
+    generator.__name__ = name
+    return generator
+
+
 def matching(text, left, right, answer, explanation):
     """Задание на соответствие: левый столбец с буквами, правый с цифрами, ответ это цифры по порядку букв."""
     letters = "АБВГД"
