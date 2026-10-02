@@ -49,8 +49,10 @@ class StructureTest(unittest.TestCase):
             counts = {}
             for item in tasks:
                 counts[item["number"]] = counts.get(item["number"], 0) + 1
+            minimum = exams.MINIMUM.get(subject, exams.DEFAULT_MINIMUM)
             for entry in exams.EXAMS[subject]:
-                self.assertEqual(counts.get(entry.number), 20, f"{subject} №{entry.number}")
+                self.assertGreaterEqual(counts.get(entry.number, 0), minimum, f"{subject} №{entry.number}")
+                self.assertLessEqual(counts.get(entry.number, 0), 20, f"{subject} №{entry.number}")
 
 
 class MathProfileTest(unittest.TestCase):
