@@ -148,26 +148,34 @@ def with_text(text, question):
     return f"Прочитайте текст и выполните задание.\n\n{text}\n\n{question}"
 
 
+def in_context(made, family, index):
+    made["context"] = f"{family}:{index}"
+    return made
+
+
 def r1_gap(r):
-    item = r.choice(READING)
+    index = r.randrange(len(READING))
+    item = READING[index]
     question, answers, explanation = item["gap"]
-    return exact(with_text(item["text"], question), answers, explanation)
+    return in_context(exact(with_text(item["text"], question), answers, explanation), "reading", index)
 
 
 def r2_meaning(r):
-    item = r.choice(READING)
+    index = r.randrange(len(READING))
+    item = READING[index]
     word, sentence, entries, answer = r.choice(item["words"])
-    return exact(
+    return in_context(exact(
         with_text(item["text"], f"В приведённом ниже фрагменте словарной статьи даны значения слова {word}. Определите значение, в котором это слово употреблено "
                                 f"в предложении {sentence} текста. Запишите цифру, соответствующую этому значению.\n\n{numbered(entries)}"),
-        [str(answer)], f"В предложении {sentence} слово употреблено в значении {answer}: «{entries[answer - 1]}».")
+        [str(answer)], f"В предложении {sentence} слово употреблено в значении {answer}: «{entries[answer - 1]}»."), "reading", index)
 
 
 def r3_style(r):
-    item = r.choice(READING)
+    index = r.randrange(len(READING))
+    item = READING[index]
     texts, flags = pick_statements(r, item["style"])
-    return choose(with_text(item["text"], "Укажите варианты ответов, в которых даны верные характеристики фрагмента текста."), texts, flags,
-                  "Верные характеристики: " + " ".join(text for text, flag in zip(texts, flags) if flag))
+    return in_context(choose(with_text(item["text"], "Укажите варианты ответов, в которых даны верные характеристики фрагмента текста."), texts, flags,
+                             "Верные характеристики: " + " ".join(text for text, flag in zip(texts, flags) if flag)), "reading", index)
 
 
 # ---------------------------------------------------------------- №4 Ударение
@@ -838,29 +846,33 @@ STORIES = [
 
 
 def t23_content(r):
-    story = r.choice(STORIES)
+    index = r.randrange(len(STORIES))
+    story = STORIES[index]
     texts, flags = pick_statements(r, story["content"])
-    return choose(with_text(story["text"], "Какие из высказываний соответствуют содержанию текста?"), texts, flags,
-                  "Содержанию текста соответствуют: " + " ".join(text for text, flag in zip(texts, flags) if flag))
+    return in_context(choose(with_text(story["text"], "Какие из высказываний соответствуют содержанию текста?"), texts, flags,
+                             "Содержанию текста соответствуют: " + " ".join(text for text, flag in zip(texts, flags) if flag)), "story", index)
 
 
 def t24_speech(r):
-    story = r.choice(STORIES)
+    index = r.randrange(len(STORIES))
+    story = STORIES[index]
     texts, flags = pick_statements(r, story["speech"])
-    return choose(with_text(story["text"], "Какие из перечисленных утверждений являются верными?"), texts, flags,
-                  "Верные утверждения: " + " ".join(text for text, flag in zip(texts, flags) if flag))
+    return in_context(choose(with_text(story["text"], "Какие из перечисленных утверждений являются верными?"), texts, flags,
+                             "Верные утверждения: " + " ".join(text for text, flag in zip(texts, flags) if flag)), "story", index)
 
 
 def t25_lexis(r):
-    story = r.choice(STORIES)
+    index = r.randrange(len(STORIES))
+    story = STORIES[index]
     question, answers, explanation = r.choice(story["lexis"])
-    return exact(with_text(story["text"], question), answers, explanation)
+    return in_context(exact(with_text(story["text"], question), answers, explanation), "story", index)
 
 
 def t26_links(r):
-    story = r.choice(STORIES)
+    index = r.randrange(len(STORIES))
+    story = STORIES[index]
     question, answer, explanation = r.choice(story["links"])
-    return exact(with_text(story["text"], question), [answer], explanation)
+    return in_context(exact(with_text(story["text"], question), [answer], explanation), "story", index)
 
 
 NUMBERS = [

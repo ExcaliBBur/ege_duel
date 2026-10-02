@@ -70,6 +70,8 @@ local function sanitize(rawTasks: any): { any }
 					-- Номер задания в ЕГЭ и его тема. У предметов без разбивки по номерам этих полей нет.
 					number = if type(raw.number) == "number" and raw.number % 1 == 0 and raw.number > 0 then raw.number else nil,
 					topic = if type(raw.topic) == "string" then raw.topic else nil,
+					-- Общий текст для нескольких заданий, например "reading:2": такие задания вариант берёт вместе.
+					context = if type(raw.context) == "string" then raw.context else nil,
 				})
 			end
 		end

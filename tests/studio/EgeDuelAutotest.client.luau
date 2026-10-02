@@ -387,6 +387,7 @@ local function run()
 	check("стрелки листания и кнопка «К заданию без ответа»", exam:FindFirstChild("Prev") and exam:FindFirstChild("Next") and exam:FindFirstChild("NextEmpty"))
 	check("в навигаторе 21 номер", exam:FindFirstChild("Nav21") and exam.Nav21.Visible and not exam.Nav22.Visible)
 	check("под заданием указана тема номера", findText(exam, "Простейшие текстовые задачи") ~= nil)
+	check("подсказка о прокрутке есть и скрыта для короткого задания", exam:FindFirstChild("MoreHint") ~= nil and not exam.MoreHint.Visible)
 	local taskText = exam:FindFirstChild("TaskText", true)
 	check("текст задания показан", taskText and #taskText.Text > 15)
 	check("лампа на парте горит во время экзамена", Workspace.Classroom.Table1.DeskLampShade.PointLight.Enabled)
@@ -526,6 +527,21 @@ local function showSamples()
 			rival = { name = "Образец " .. index, subject = "physics", answered = 3, total = 8, submitted = false, left = false },
 		})
 		task.wait(1.7)
+		if index <= 3 then
+			for _, item in panel:GetDescendants() do
+				if item:IsA("ScrollingFrame") and item:FindFirstChild("TaskText", true) and item.Parent.Visible then
+					local hint = item.Parent:FindFirstChild("MoreHint")
+					local text = item:FindFirstChild("TaskText", true)
+					local long = item.AbsoluteCanvasSize.Y > item.AbsoluteWindowSize.Y + 8
+					table.insert(lines, string.format("%s образец %d: холст %d, окно %d, подсказка %s, текст %d",
+						if long == (hint and hint.Visible) and text.TextBounds.Y + 20 <= item.AbsoluteCanvasSize.Y then "ok  " else "FAIL", index,
+						item.AbsoluteCanvasSize.Y, item.AbsoluteWindowSize.Y, tostring(hint and hint.Visible), text.TextBounds.Y))
+					-- Прокручиваем до конца, чтобы на снимке был виден конец длинного задания.
+					item.CanvasPosition = Vector2.new(0, 100000)
+					task.wait(1.2)
+				end
+			end
+		end
 	end
 	preview.hide()
 end

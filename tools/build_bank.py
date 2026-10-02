@@ -200,6 +200,8 @@ def generate_numbered(subject: str, rng: random.Random, per_number: int) -> list
             })
             if "figure" in made:
                 tasks[-1]["figure"] = made["figure"]
+            if "context" in made:
+                tasks[-1]["context"] = made["context"]
     return tasks
 
 
@@ -249,7 +251,7 @@ def build(seed: int, per_generator: int, per_number: int = 20) -> int:
         ordered = [
             {
                 key: item[key]
-                for key in ("id", "group", "number", "topic", "text", "answers", "points", "kind", "explanation", "figure")
+                for key in ("id", "group", "number", "topic", "context", "text", "answers", "points", "kind", "explanation", "figure")
                 if key in item
             }
             for item in tasks

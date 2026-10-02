@@ -48,14 +48,18 @@ samples.Name = "EgeTestSamples"
 samples.Parent = ReplicatedStorage
 samples.OnServerInvoke = function()
 	local wanted = {
-		{ "informatics", { "m_graph_table", "l_truth_table", "b_segments", "e_editor", "t_two_rectangles", "fig_roads", "fig_paths" } },
-		{ "physics", { "a_graph", "h_cycle", "c_graph", "i_reading", "x_setups", "fig_circuit_series" } },
-		{ "math_base", { "b3_bar_chart", "b6_carriers", "b7_function_points", "b18_number_line" } },
-		{ "math_prof", { "p1_circle_angles", "st_table", "d_graph_derivative", "g_hyperbola" } },
-		{ "chemistry", { "fig_atom", "fig_skeleton" } },
-		{ "biology", { "fig_punnett", "fig_dna" } },
-		{ "geography", { "fig_climate", "fig_wind_rose" } },
-		{ "social", { "fig_poll", "fig_market" } },
+		{ "russian", { "t23_content", "r2_meaning", "o8_syntax", "o9_roots", "o22_devices" } },
+		{ "english", { "e12_reading", "e10_headings", "e11_gaps", "e19_grammar" } },
+		{ "chemistry", { "k23_concentrations", "e7_reagents", "k22_shift", "o16_chain" } },
+		{ "biology", { "b21_data", "b12_taxa" } },
+		{ "geography", { "g16_migration", "g7_employment", "fig_climate" } },
+		{ "history", { "h4_table", "h6_passage" } },
+		{ "literature", { "l7_metre", "l2_characters" } },
+		{ "social", { "s13_authority_match", "fig_market" } },
+		{ "informatics", { "m_graph_table", "l_truth_table" } },
+		{ "physics", { "a_graph", "h_cycle", "i_reading", "x_setups" } },
+		{ "math_base", { "b3_bar_chart", "b7_function_points" } },
+		{ "math_prof", { "d_graph_derivative", "g_hyperbola" } },
 	}
 	local picked = {}
 	local Bank = require(game:GetService("ServerScriptService"):WaitForChild("Server"):WaitForChild("Bank"))

@@ -59,10 +59,30 @@ local function pickByNumbers(tasks, numbers: { number }, count: number, random)
 		end
 	end
 
+	-- Задания к одному тексту помечены общим context вида "семейство:текст". Выбрав текст для первого
+	-- такого номера, остальные номера того же семейства берём по тому же тексту, как на экзамене.
+	local contexts = {}
 	local picked = {}
 	for _, number in chosen do
 		local pool = byNumber[number]
-		table.insert(picked, pool[random(#pool)])
+		local task = pool[random(#pool)]
+		local family = if task.context then string.match(task.context, "^([^:]+):") else nil
+		if family then
+			if contexts[family] then
+				local same = {}
+				for _, candidate in pool do
+					if candidate.context == contexts[family] then
+						table.insert(same, candidate)
+					end
+				end
+				if #same > 0 then
+					task = same[random(#same)]
+				end
+			else
+				contexts[family] = task.context
+			end
+		end
+		table.insert(picked, task)
 	end
 	return picked
 end

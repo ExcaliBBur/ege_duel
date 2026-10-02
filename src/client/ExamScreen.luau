@@ -18,6 +18,7 @@ local ExamScreen = {}
 local C = Ui.colors
 local CELLS = Settings.answerMaxChars
 local MAX_TASKS = 30 -- самая длинная первая часть: 28 заданий по химии
+local TASK_LABEL_HEIGHT = 4000 -- запас по высоте для текста задания, см. комментарий у TaskText
 
 local function serverNow(): number
 	return Workspace:GetServerTimeNow()
@@ -141,36 +142,46 @@ function ExamScreen.create(parent: Instance, actions)
 		ScrollBarThickness = 6,
 		ScrollBarImageColor3 = C.muted,
 		CanvasSize = UDim2.new(),
-		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollingDirection = Enum.ScrollingDirection.Y,
 		Parent = frame,
 	})
 	local pointsLabel = Ui.caption("", { Size = UDim2.new(1, -12, 0, 16), Parent = taskScroll })
 	-- Текст слева, рисунок справа: так задание с рисунком помещается на экран без прокрутки.
+	-- Автоматический размер подписи внутри прокручиваемой области не вырастает выше её окна, и длинное задание
+	-- обрезалось бы. Поэтому подпись заведомо высокая, а высота холста считается по фактическим границам текста.
 	local taskLabel = Ui.label({
 		Name = "TaskText",
 		TextSize = 19,
 		LineHeight = 1.15,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		Position = UDim2.fromOffset(0, 22),
-		Size = UDim2.new(1, -12, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.new(1, -12, 0, TASK_LABEL_HEIGHT),
 		Parent = taskScroll,
 	})
 
 	-- Длинное задание (соответствие, выбор утверждений) может не поместиться: подсказываем, что его надо прокрутить.
-	local moreHint = Ui.label({
+	local moreHint = Ui.pill("▼ задание продолжается ниже, прокрутите", C.warn, C.warnSoft, {
 		Name = "MoreHint",
-		Text = "▼ задание продолжается ниже, прокрутите",
 		TextSize = 13,
-		TextColor3 = C.muted,
-		TextXAlignment = Enum.TextXAlignment.Right,
-		Position = UDim2.new(1, -400, 0, 150),
-		Size = UDim2.fromOffset(328, 16),
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 0, 456),
+		Size = UDim2.fromOffset(330, 22),
+		ZIndex = 5,
 		Visible = false,
 		Parent = frame,
 	})
 	local function updateMoreHint()
+		-- Границы текста приходят в экранных точках, а размеры холста задаются без учёта масштаба интерфейса.
+		local scale = taskLabel.AbsoluteSize.Y / TASK_LABEL_HEIGHT
+		if scale > 0 then
+			local height = 22 + math.ceil(taskLabel.TextBounds.Y / scale) + 12
+			if figureFrame then
+				height = math.max(height, 22 + figureFrame.Size.Y.Offset + 8)
+			end
+			if taskScroll.CanvasSize.Y.Offset ~= height then
+				taskScroll.CanvasSize = UDim2.fromOffset(0, height)
+			end
+		end
 		local hidden = taskScroll.AbsoluteCanvasSize.Y - taskScroll.AbsoluteWindowSize.Y - taskScroll.CanvasPosition.Y
 		moreHint.Visible = hidden > 8
 	end
@@ -421,9 +432,9 @@ function ExamScreen.create(parent: Instance, actions)
 			local width = figureFrame.Size.X.Offset
 			figureFrame.AnchorPoint = Vector2.new(1, 0)
 			figureFrame.Position = UDim2.new(1, -14, 0, 22)
-			taskLabel.Size = UDim2.new(1, -(width + 40), 0, 0)
+			taskLabel.Size = UDim2.new(1, -(width + 40), 0, TASK_LABEL_HEIGHT)
 		else
-			taskLabel.Size = UDim2.new(1, -12, 0, 0)
+			taskLabel.Size = UDim2.new(1, -12, 0, TASK_LABEL_HEIGHT)
 		end
 		taskScroll.CanvasPosition = Vector2.zero
 		flagButton.Text = if flags[current] then "Снять отметку" else "Отметить"
@@ -660,6 +671,7 @@ function ExamScreen.create(parent: Instance, actions)
 		end
 		local remaining = endsAt - serverNow()
 		timerLabel.Text = Ui.clock(remaining)
+		updateMoreHint()
 
 		-- Жёлтый за 5 минут до конца (за 2 минуты в коротком матче), красный за минуту.
 		local warnAt = if duration > 600 then 300 else 120

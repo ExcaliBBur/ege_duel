@@ -175,6 +175,33 @@ end
 check(kinds > 6, "Variant: разные seed дают разные номера и разные задания")
 equal(table.concat(Variant.numbersOf(numbered), " "), "1 2 3 4 5 6 8 9 10 11 12", "Variant.numbersOf: номера по возрастанию")
 
+-- Задания к одному тексту: номера 1-3 относятся к семейству "reading", номера 5-6 к семейству "story".
+local withTexts = {}
+for number = 1, 6 do
+	for text = 1, 4 do
+		for copy = 1, 2 do
+			local family = if number <= 3 then "reading" elseif number >= 5 then "story" else nil
+			table.insert(withTexts, { id = number .. "-" .. text .. "-" .. copy, number = number, context = if family then family .. ":" .. text else nil })
+		end
+	end
+end
+local sameText = true
+for seed = 1, 60 do
+	local variant = Variant.pick(withTexts, 0, seed)
+	sameText = sameText and variant[1].context == variant[2].context and variant[2].context == variant[3].context
+		and variant[5].context == variant[6].context and variant[4].context == nil
+end
+check(sameText, "Variant: задания к одному тексту попадают в вариант вместе")
+local textKinds = {}
+for seed = 1, 60 do
+	textKinds[Variant.pick(withTexts, 0, seed)[1].context] = true
+end
+local textCount = 0
+for _ in textKinds do
+	textCount += 1
+end
+check(textCount >= 3, "Variant: в разных вариантах встречаются разные тексты")
+
 -- ---------------------------------------------------------------- Duel: матч целиком
 
 local function makeTasks(prefix, count, points)
@@ -519,7 +546,7 @@ equal(M.Calculator.format(1 / 3), "0,3333333333", "калькулятор: не 
 -- Проверка заданий при загрузке банка.
 local goodFigure = { w = 420, h = 260, items = { { "line", 0, 0, 10, 10, 1 }, { "text", 5, 5, "А", "c" }, { "circle", 5, 5, 3, 2 } } }
 local cleaned = M.RealBank.sanitize({
-	{ text = "Вопрос", answers = { "1" }, points = 2, kind = "set", explanation = "п", figure = goodFigure },
+	{ text = "Вопрос", answers = { "1" }, points = 2, kind = "set", explanation = "п", figure = goodFigure, number = 3, topic = "Тема", context = "reading:1" },
 	{ text = "Вопрос 2", answers = { "1" }, figure = { w = 10, h = 10, items = { { "line", 0, 0, "x", 10, 1 } } } },
 	{ text = "Вопрос 3", answers = { "1" }, figure = { w = 10, h = 10, items = { { "bomb", 1, 2 } } } },
 	{ text = "", answers = { "1" } },
@@ -529,6 +556,9 @@ local cleaned = M.RealBank.sanitize({
 equal(#cleaned, 3, "банк отбрасывает задания без текста и без ответа")
 equal(#cleaned[1].figure.items, 3, "корректный рисунок сохраняется")
 equal(cleaned[1].points, 2, "баллы задания сохраняются")
+equal(cleaned[1].number, 3, "номер ЕГЭ сохраняется")
+equal(cleaned[1].context, "reading:1", "общий текст задания сохраняется")
+equal(cleaned[2].number, nil, "у задания без номера номера нет")
 equal(cleaned[2].figure, nil, "рисунок с нечисловой координатой отбрасывается")
 equal(cleaned[3].figure, nil, "рисунок с неизвестной фигурой отбрасывается")
 equal(cleaned[2].kind, "exact", "вид проверки по умолчанию")
