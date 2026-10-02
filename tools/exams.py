@@ -5,6 +5,7 @@ PART_ONE: сколько номеров в первой части экзаме�
 SKIPPED: номера первой части, которые нельзя перенести в игру, и причина.
 """
 
+import exam_history
 import exam_informatics
 import exam_math_base
 import exam_math_prof
@@ -19,6 +20,7 @@ EXAMS = {
     "physics": exam_physics.NUMBERS,
     "informatics": exam_informatics.NUMBERS,
     "social": exam_social.NUMBERS,
+    "history": exam_history.NUMBERS,
 }
 
 # Сколько разных заданий должно набираться на каждый номер. В предметах с вычисляемыми заданиями это 20,
