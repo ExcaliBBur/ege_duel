@@ -48,11 +48,10 @@ samples.Name = "EgeTestSamples"
 samples.Parent = ReplicatedStorage
 samples.OnServerInvoke = function()
 	local wanted = {
-		{ "physics", { "a_graph", "h_melting_graph", "h_cycle", "c_graph", "i_reading", "x_setups", "mechanics_changes", "general_statements",
-			"fig_xt_graph", "fig_circuit_series", "fig_forces" } },
-		{ "math_base", { "b3_bar_chart", "b6_carriers", "b7_function_points", "b9_plan", "b18_number_line" } },
-		{ "math_prof", { "p1_circle_angles", "st_table", "d_graph_derivative", "g_hyperbola", "g_logarithm" } },
-		{ "informatics", { "fig_paths", "fig_spreadsheet" } },
+		{ "informatics", { "m_graph_table", "l_truth_table", "b_segments", "e_editor", "t_two_rectangles", "fig_roads", "fig_paths" } },
+		{ "physics", { "a_graph", "h_cycle", "c_graph", "i_reading", "x_setups", "fig_circuit_series" } },
+		{ "math_base", { "b3_bar_chart", "b6_carriers", "b7_function_points", "b18_number_line" } },
+		{ "math_prof", { "p1_circle_angles", "st_table", "d_graph_derivative", "g_hyperbola" } },
 		{ "chemistry", { "fig_atom", "fig_skeleton" } },
 		{ "biology", { "fig_punnett", "fig_dna" } },
 		{ "geography", { "fig_climate", "fig_wind_rose" } },

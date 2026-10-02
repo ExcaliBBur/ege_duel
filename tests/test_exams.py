@@ -187,5 +187,77 @@ class PhysicsTest(unittest.TestCase):
                 self.assertEqual(made["text"].count("\n") - 1, 5, generator.__name__)
 
 
+class InformaticsTest(unittest.TestCase):
+    def setUp(self):
+        import exam_informatics
+        self.i = exam_informatics
+        self.rng = random.Random(15)
+
+    def test_game_classes_match_independent_search(self):
+        def wins(stones, moves_left, add, factor, goal):
+            """Ходящий может выиграть не позже чем своим ходом номер moves_left."""
+            return any(m >= goal or (moves_left > 1 and loses(m, moves_left - 1, add, factor, goal)) for m in (stones + add, stones * factor))
+
+        def loses(stones, moves_left, add, factor, goal):
+            """Соперник ходящего выигрывает не позже чем своим ходом номер moves_left при любой игре ходящего."""
+            return all(m < goal and wins(m, moves_left, add, factor, goal) for m in (stones + add, stones * factor))
+
+        for add, factor, goal in [(1, 2, 29), (2, 3, 50), (3, 2, 41), (4, 3, 77), (1, 3, 33)]:
+            win1, lose1, win2, lose2 = self.i.game_classes(add, factor, goal)
+            positions = range(1, goal)
+            self.assertEqual(lose1, {s for s in positions if loses(s, 1, add, factor, goal)})
+            self.assertEqual(win2, {s for s in positions if wins(s, 2, add, factor, goal) and not wins(s, 1, add, factor, goal)})
+            self.assertEqual(lose2, {s for s in positions if loses(s, 2, add, factor, goal) and not loses(s, 1, add, factor, goal)})
+
+    def test_fano_answer_is_the_shortest_valid_code(self):
+        for _ in range(200):
+            made = self.i.c_fano(self.rng)
+            known = re.findall(r": ([01]+)", made["text"])
+            answer = made["answer"]
+            self.assertFalse(any(answer.startswith(code) or code.startswith(answer) for code in known), made["text"])
+            for length in range(1, len(answer) + 1):
+                for number in range(2 ** length):
+                    code = format(number, f"0{length}b")
+                    if (len(code), code) < (len(answer), answer):
+                        self.assertTrue(any(code.startswith(k) or k.startswith(code) for k in known), (made["text"], code))
+
+    def test_programs_count_matches_plain_recursion(self):
+        def count(number, goal, forward, required, banned, seen):
+            if number == banned or number > goal:
+                return 0
+            seen = seen or number == required
+            if number == goal:
+                return 1 if (required is None or seen) else 0
+            return sum(count(move(number), goal, forward, required, banned, seen) for move in forward)
+
+        forward = [lambda n: n + 1, lambda n: n * 2]
+        _, backward = self.i.COMMANDS[0]
+        for start, goal, required, banned in [(1, 20, None, None), (2, 30, 12, None), (1, 25, None, 9), (3, 34, 10, 17), (1, 22, 8, 5)]:
+            self.assertEqual(self.i.count_programs(start, goal, backward, required, banned), count(start, goal, forward, required, banned, False))
+
+    def test_truth_table_answer_reproduces_the_rows(self):
+        for _ in range(100):
+            made = self.i.l_truth_table(self.rng)
+            self.assertEqual(sorted(made["answer"]), list("wxyz"))
+
+    def test_inequality_answers_by_brute_force(self):
+        for _ in range(40):
+            made = self.i.b_inequality(self.rng)
+            answer = int(made["answer"])
+            match = re.search(r"\(x \+ (\d+)y < A\) ∨ \(y > x\) ∨ \(x > (\d+)\)", made["text"])
+            if match:
+                factor, bound = int(match.group(1)), int(match.group(2))
+
+                def holds(a):
+                    return all(x + factor * y < a or y > x or x > bound for x in range(bound + 3) for y in range(bound + 3))
+            else:
+                first, second = (int(n) for n in re.search(r"\(x > (\d+)\) ∨ \(y > (\d+)\)", made["text"]).groups())
+
+                def holds(a):
+                    return all(x * y < a or x > first or y > second for x in range(first + 3) for y in range(second + 3))
+            self.assertTrue(holds(answer), made["text"])
+            self.assertFalse(holds(answer - 1), made["text"])
+
+
 if __name__ == "__main__":
     unittest.main()

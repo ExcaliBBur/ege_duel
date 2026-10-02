@@ -5,6 +5,7 @@ PART_ONE: сколько номеров в первой части экзаме�
 SKIPPED: номера первой части, которые нельзя перенести в игру, и причина.
 """
 
+import exam_informatics
 import exam_math_base
 import exam_math_prof
 import exam_physics
@@ -13,6 +14,7 @@ EXAMS = {
     "math_base": exam_math_base.NUMBERS,
     "math_prof": exam_math_prof.NUMBERS,
     "physics": exam_physics.NUMBERS,
+    "informatics": exam_informatics.NUMBERS,
 }
 
 # Сколько заданий в первой части (с кратким ответом) у каждого предмета.
