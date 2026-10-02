@@ -5,6 +5,7 @@ PART_ONE: сколько номеров в первой части экзаме�
 SKIPPED: номера первой части, которые нельзя перенести в игру, и причина.
 """
 
+import exam_biology
 import exam_chemistry
 import exam_history
 import exam_informatics
@@ -23,11 +24,12 @@ EXAMS = {
     "social": exam_social.NUMBERS,
     "history": exam_history.NUMBERS,
     "chemistry": exam_chemistry.NUMBERS,
+    "biology": exam_biology.NUMBERS,
 }
 
 # Сколько разных заданий должно набираться на каждый номер. В предметах с вычисляемыми заданиями это 20,
 # а там, где задания привязаны к авторским текстам, их меньше.
-MINIMUM = {"russian": 4, "social": 12}
+MINIMUM = {"russian": 4, "social": 12, "biology": 12}
 DEFAULT_MINIMUM = 20
 
 # Сколько заданий в первой части (с кратким ответом) у каждого предмета.
