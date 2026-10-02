@@ -10,6 +10,7 @@ import exam_math_base
 import exam_math_prof
 import exam_physics
 import exam_russian
+import exam_social
 
 EXAMS = {
     "russian": exam_russian.NUMBERS,
@@ -17,11 +18,12 @@ EXAMS = {
     "math_prof": exam_math_prof.NUMBERS,
     "physics": exam_physics.NUMBERS,
     "informatics": exam_informatics.NUMBERS,
+    "social": exam_social.NUMBERS,
 }
 
 # Сколько разных заданий должно набираться на каждый номер. В предметах с вычисляемыми заданиями это 20,
 # а там, где задания привязаны к авторским текстам, их меньше.
-MINIMUM = {"russian": 4}
+MINIMUM = {"russian": 4, "social": 12}
 DEFAULT_MINIMUM = 20
 
 # Сколько заданий в первой части (с кратким ответом) у каждого предмета.
