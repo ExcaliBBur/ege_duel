@@ -223,4 +223,14 @@ end
 function mockBank.count(subjectId)
 	return #mockBank.getTasks(subjectId)
 end
+function mockBank.fullCount(subjectId)
+	local seen, count = {}, 0
+	for _, task in mockBank.getTasks(subjectId) do
+		if task.number and not seen[task.number] then
+			seen[task.number] = true
+			count += 1
+		end
+	end
+	return count
+end
 function mockBank.load() end

@@ -1,4 +1,5 @@
--- Составление варианта: случайные задания из банка, по возможности из разных тем.
+-- Составление варианта. Если у заданий есть номера ЕГЭ, вариант собирается по номерам:
+-- по одному заданию на номер, в порядке номеров, как на экзамене. Иначе берутся случайные задания разных тем.
 -- Свой генератор случайных чисел нужен, чтобы один и тот же seed давал один и тот же вариант.
 local Variant = {}
 
@@ -23,9 +24,52 @@ local function shuffle(list, random)
 	end
 end
 
--- Выбирает count заданий. Задания с одинаковым group берутся по очереди, чтобы темы не повторялись подряд.
-function Variant.pick(tasks, count: number, seed: number)
-	local random = newRandom(seed)
+-- Номера ЕГЭ, для которых в банке есть задания, по возрастанию.
+function Variant.numbersOf(tasks): { number }
+	local seen, numbers = {}, {}
+	for _, task in tasks do
+		if task.number and not seen[task.number] then
+			seen[task.number] = true
+			table.insert(numbers, task.number)
+		end
+	end
+	table.sort(numbers)
+	return numbers
+end
+
+-- Вариант по номерам. count = 0 означает всю первую часть; иначе номера делятся на count
+-- подряд идущих групп и из каждой берётся один случайный номер, чтобы сокращённый вариант
+-- охватывал экзамен от начала до конца.
+local function pickByNumbers(tasks, numbers: { number }, count: number, random)
+	local byNumber = {}
+	for _, task in tasks do
+		if task.number then
+			byNumber[task.number] = byNumber[task.number] or {}
+			table.insert(byNumber[task.number], task)
+		end
+	end
+
+	local chosen = numbers
+	if count > 0 and count < #numbers then
+		chosen = {}
+		for group = 1, count do
+			local first = math.floor((group - 1) * #numbers / count) + 1
+			local last = math.floor(group * #numbers / count)
+			table.insert(chosen, numbers[first + random(last - first + 1) - 1])
+		end
+	end
+
+	local picked = {}
+	for _, number in chosen do
+		local pool = byNumber[number]
+		table.insert(picked, pool[random(#pool)])
+	end
+	return picked
+end
+
+-- Выбирает count заданий без учёта номеров. Задания с одинаковым group берутся по очереди,
+-- чтобы темы не повторялись подряд.
+local function pickByGroups(tasks, count: number, random)
 	local groups, order = {}, {}
 	for _, task in tasks do
 		local key = task.group or task.id or "общая"
@@ -61,6 +105,16 @@ function Variant.pick(tasks, count: number, seed: number)
 		round += 1
 	end
 	return picked
+end
+
+-- count = 0 означает всю первую часть (для банка без номеров это 20 заданий).
+function Variant.pick(tasks, count: number, seed: number)
+	local random = newRandom(seed)
+	local numbers = Variant.numbersOf(tasks)
+	if #numbers > 0 then
+		return pickByNumbers(tasks, numbers, count, random)
+	end
+	return pickByGroups(tasks, if count > 0 then count else 20, random)
 end
 
 return Variant

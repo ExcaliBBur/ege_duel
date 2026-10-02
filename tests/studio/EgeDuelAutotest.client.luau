@@ -358,8 +358,9 @@ local function run()
 	check("в настройке показан соперник", findText(setup, "Тестовый соперник") ~= nil)
 	action:FireServer("setSubject", "math_base")
 	action:FireServer("voteTime", 10)
-	action:FireServer("voteCount", 20)
+	action:FireServer("voteCount", 0)
 	task.wait(1)
+	check("в настройке есть вариант «вся часть 1» с числом номеров", findText(setup, "вся часть 1 %(21%)") ~= nil)
 	check("кнопка «Готов» на экране настройки", findText(setup, "^Готов$") ~= nil)
 	mark("экран настройки")
 	hold()
@@ -378,13 +379,14 @@ local function run()
 	mark("отсчёт")
 	task.wait(3)
 	mark("экран экзамена")
-	check("в шапке предмет и номер задания", findText(exam, "задание 1 из 20") ~= nil)
+	check("в шапке предмет и номер задания", findText(exam, "задание №1 %(1 из 21%)") ~= nil)
 	check("таймер идёт", findText(exam, "^%d%d:%d%d$") ~= nil)
 	check("кнопка «Сдать работу» стоит в шапке", exam:FindFirstChild("Submit", true) and exam:FindFirstChild("Submit", true).Parent ~= exam)
 	check("окно подтверждения сдачи закрыто", exam:FindFirstChild("Confirm") and not exam.Confirm.Visible)
 	check("у математики есть кнопка справочных материалов", exam:FindFirstChild("ReferenceButton") and exam.ReferenceButton.Visible)
 	check("стрелки листания и кнопка «К заданию без ответа»", exam:FindFirstChild("Prev") and exam:FindFirstChild("Next") and exam:FindFirstChild("NextEmpty"))
-	check("в навигаторе 20 номеров", exam:FindFirstChild("Nav20") and exam.Nav20.Visible)
+	check("в навигаторе 21 номер", exam:FindFirstChild("Nav21") and exam.Nav21.Visible and not exam.Nav22.Visible)
+	check("под заданием указана тема номера", findText(exam, "Простейшие текстовые задачи") ~= nil)
 	local taskText = exam:FindFirstChild("TaskText", true)
 	check("текст задания показан", taskText and #taskText.Text > 15)
 	check("лампа на парте горит во время экзамена", Workspace.Classroom.Table1.DeskLampShade.PointLight.Enabled)
@@ -413,7 +415,7 @@ local function run()
 	end
 
 	waitFor("виден прогресс соперника", function()
-		return findText(exam, "ответил на %d+ из 20")
+		return findText(exam, "ответил на %d+ из %d+")
 	end, 12)
 	hold()
 
@@ -428,11 +430,12 @@ local function run()
 	mark("экран итогов")
 	local cards = 0
 	for _, item in results:GetDescendants() do
-		if item:IsA("TextLabel") and string.find(item.Text, "^Верных ответов: %d+ из 20$") then
+		if item:IsA("TextLabel") and string.find(item.Text, "^Верных ответов: %d+ из %d+$") then
 			cards += 1
 		end
 	end
 	check("в итогах число верных ответов у обоих игроков", cards == 2)
+	check("в итогах у игрока 21 задание", findText(results, "^Верных ответов: %d+ из 21$") ~= nil)
 	check("в итогах есть исход", findText(results, "^Победа$") or findText(results, "^Поражение$") or findText(results, "^Ничья$"))
 	check("в итогах есть проценты", findText(results, "^%d+%%$") ~= nil)
 	local list = results:FindFirstChildWhichIsA("ScrollingFrame")
@@ -444,7 +447,7 @@ local function run()
 			end
 		end
 	end
-	check("разбор ошибок показан, строк: " .. rows, rows >= 19)
+	check("разбор ошибок показан, строк: " .. rows, rows >= 20)
 	check("в разборе ответ с запятой", findText(results, "ваш ответ: 0,5") ~= nil)
 	check("разбор содержит верный ответ", findText(results, "верно: ") ~= nil)
 	local figures = countNamed(results, "Figure")
@@ -496,18 +499,18 @@ local function showSamples()
 	if not panel or not module then
 		return
 	end
-	-- Справочные материалы: показываем каждую вкладку по очереди.
-	local referenceModule = player.PlayerScripts:FindFirstChild("Reference", true)
-	if referenceModule then
-		local reference = require(referenceModule).create(panel)
-		for _, subject in { "chemistry", "physics", "math_base", "geography" } do
-			reference.open(subject)
-			task.wait(3)
+	-- EgeTestHold.Value = true: показываем справочные материалы, false: задания-образцы.
+	if ReplicatedStorage.EgeTestHold.Value then
+		local referenceModule = player.PlayerScripts:FindFirstChild("Reference", true)
+		if referenceModule then
+			local reference = require(referenceModule).create(panel)
+			for _, subject in { "chemistry", "physics", "math_base", "geography" } do
+				reference.open(subject)
+				task.wait(3)
+			end
+			reference.close()
 		end
-		reference.close()
-	end
-	if ReplicatedStorage:FindFirstChild("EgeTestHold") and ReplicatedStorage.EgeTestHold.Value then
-		return -- короткий режим снимков: только справочные материалы
+		return
 	end
 
 	local tasks = ReplicatedStorage:WaitForChild("EgeTestSamples"):InvokeServer()
@@ -522,7 +525,7 @@ local function showSamples()
 			tasks = { sample, sample, sample, sample, sample, sample, sample, sample },
 			rival = { name = "Образец " .. index, subject = "physics", answered = 3, total = 8, submitted = false, left = false },
 		})
-		task.wait(2.5)
+		task.wait(1.7)
 	end
 	preview.hide()
 end

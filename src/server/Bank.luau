@@ -14,7 +14,7 @@ local tasksBySubject: { [string]: { any } } = {}
 local VALID_KINDS = { exact = true, number = true, set = true, order = true }
 
 local FIGURE_FIELDS = { line = 6, rect = 6, circle = 5, text = 5 } -- вид фигуры и число полей
-local FIGURE_MAX_ITEMS = 150
+local FIGURE_MAX_ITEMS = 240
 
 -- Рисунок к заданию: размеры и список простых фигур. Некорректный рисунок отбрасывается целиком.
 local function sanitizeFigure(raw: any): any
@@ -55,7 +55,7 @@ local function sanitize(rawTasks: any): { any }
 					table.insert(answers, answer)
 				end
 			end
-			local points = if raw.points == 2 then 2 else 1
+			local points = if raw.points == 2 or raw.points == 3 then raw.points else 1
 			local kind = if VALID_KINDS[raw.kind] then raw.kind else "exact"
 			if #answers > 0 then
 				table.insert(result, {
@@ -67,6 +67,9 @@ local function sanitize(rawTasks: any): { any }
 					kind = kind,
 					explanation = if type(raw.explanation) == "string" then raw.explanation else "",
 					figure = sanitizeFigure(raw.figure),
+					-- Номер задания в ЕГЭ и его тема. У предметов без разбивки по номерам этих полей нет.
+					number = if type(raw.number) == "number" and raw.number % 1 == 0 and raw.number > 0 then raw.number else nil,
+					topic = if type(raw.topic) == "string" then raw.topic else nil,
 				})
 			end
 		end
@@ -161,6 +164,19 @@ end
 
 function Bank.count(subjectId: string): number
 	return #Bank.getTasks(subjectId)
+end
+
+-- Сколько заданий в полном варианте предмета: число номеров первой части, для которых есть задания.
+-- Для предмета без разбивки по номерам возвращает 0.
+function Bank.fullCount(subjectId: string): number
+	local seen, count = {}, 0
+	for _, task in Bank.getTasks(subjectId) do
+		if task.number and not seen[task.number] then
+			seen[task.number] = true
+			count += 1
+		end
+	end
+	return count
 end
 
 -- Случайное задание без рисунка из любого предмета, для доски «Задача дня».

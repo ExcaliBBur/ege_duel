@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 import generators  # noqa: E402
 import facts  # noqa: E402,F401  (добавляет в generators задания по таблицам фактов)
 import figures  # noqa: E402,F401  (добавляет в generators задания с рисунками)
+import exams  # noqa: E402  (предметы, разбитые по номерам заданий ЕГЭ)
 
 ROOT = Path(__file__).resolve().parent.parent
 AUTHORED = ROOT / "bank" / "authored"
@@ -61,8 +62,8 @@ def check(subject: str, item: dict) -> list[str]:
     kind = item.get("kind")
     if kind not in KINDS:
         errors.append(f"неизвестный вид проверки {kind!r}")
-    if item.get("points") not in (1, 2):
-        errors.append("баллы должны быть 1 или 2")
+    if item.get("points") not in (1, 2, 3):
+        errors.append("баллы должны быть от 1 до 3")
     if not isinstance(item.get("explanation"), str) or not item["explanation"].strip():
         errors.append("нет пояснения")
     for answer in answers:
@@ -89,7 +90,7 @@ def check(subject: str, item: dict) -> list[str]:
 
 
 FIGURE_ITEMS = {"line": 6, "rect": 6, "circle": 5, "text": 5}  # вид фигуры и число полей
-FIGURE_MAX_ITEMS = 150  # как в Bank.luau
+FIGURE_MAX_ITEMS = 240  # как в Bank.luau
 
 
 def check_figure(figure) -> list[str]:
@@ -167,6 +168,41 @@ def generate(subject: str, rng: random.Random, per_generator: int, taken: set[st
     return tasks
 
 
+def generate_numbered(subject: str, rng: random.Random, per_number: int) -> list[dict]:
+    """Задания предмета, разбитого по номерам ЕГЭ: на каждый номер per_number заданий.
+
+    Генераторы одного номера вызываются по очереди, чтобы разные подтипы встречались поровну.
+    """
+    tasks = []
+    for entry in exams.EXAMS[subject]:
+        seen = set()
+        attempts = 0
+        made_count = 0
+        while made_count < per_number and attempts < per_number * 40:
+            generator = entry.generators[attempts % len(entry.generators)]
+            attempts += 1
+            made = generator(rng)
+            mark = made.get("key") or identity(made)
+            if mark in seen:
+                continue
+            seen.add(mark)
+            made_count += 1
+            name = generator.__name__
+            tasks.append({
+                "group": name,
+                "number": entry.number,
+                "topic": entry.title,
+                "text": made["text"],
+                "answers": made.get("answers") or [made["answer"]],
+                "points": made.get("points", entry.points),
+                "kind": made.get("kind") or "number",
+                "explanation": made["explanation"],
+            })
+            if "figure" in made:
+                tasks[-1]["figure"] = made["figure"]
+    return tasks
+
+
 def dump_tasks(subject: str, tasks: list[dict]) -> str:
     """JSON предмета: одно задание на строку, чтобы рисунки не раздували файл."""
     lines = [json.dumps(item, ensure_ascii=False, separators=(",", ":")) for item in tasks]
@@ -188,15 +224,18 @@ def embed(subject: str, text: str) -> None:
         (folder / f"{number:02d}.txt").write_text(text[start:start + CHUNK_CHARS], encoding="utf-8", newline="")
 
 
-def build(seed: int, per_generator: int) -> int:
+def build(seed: int, per_generator: int, per_number: int = 20) -> int:
     rng = random.Random(seed)
     DIST.mkdir(parents=True, exist_ok=True)
     index = {"version": seed, "subjects": {}}
     errors = []
 
     for subject in SUBJECTS:
-        authored = load_authored(subject)
-        tasks = authored + generate(subject, rng, per_generator, {identity(item) for item in authored})
+        if subject in exams.EXAMS:
+            tasks = generate_numbered(subject, rng, per_number)
+        else:
+            authored = load_authored(subject)
+            tasks = authored + generate(subject, rng, per_generator, {identity(item) for item in authored})
         seen_texts = set()
         for number, item in enumerate(tasks, start=1):
             item["id"] = f"{subject}-{number:03d}"
@@ -210,7 +249,7 @@ def build(seed: int, per_generator: int) -> int:
         ordered = [
             {
                 key: item[key]
-                for key in ("id", "group", "text", "answers", "points", "kind", "explanation", "figure")
+                for key in ("id", "group", "number", "topic", "text", "answers", "points", "kind", "explanation", "figure")
                 if key in item
             }
             for item in tasks
@@ -232,7 +271,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Сборка банка заданий")
     parser.add_argument("--seed", type=int, default=2026)
     parser.add_argument("--per-generator", type=int, default=18)
+    parser.add_argument("--per-number", type=int, default=20, help="заданий на каждый номер ЕГЭ")
     arguments = parser.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stderr.reconfigure(encoding="utf-8")
-    sys.exit(build(arguments.seed, arguments.per_generator))
+    sys.exit(build(arguments.seed, arguments.per_generator, arguments.per_number))

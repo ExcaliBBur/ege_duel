@@ -9,7 +9,7 @@
       "EgeTestHold": {
         "$className": "BoolValue",
         "$properties": {
-          "Value": true
+          "Value": false
         }
       }
     },
@@ -38,7 +38,7 @@
     },
     "HttpService": {
       "$properties": {
-        "HttpEnabled": true
+        "HttpEnabled": false
       }
     }
   }

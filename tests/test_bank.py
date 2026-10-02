@@ -177,7 +177,8 @@ class CheckTest(unittest.TestCase):
         self.assertTrue(build_bank.check("x", self.good(answers=[])))
         self.assertTrue(build_bank.check("x", self.good(kind="number", answers=["abc"])))
         self.assertTrue(build_bank.check("x", self.good(kind="set", answers=["113"])))
-        self.assertTrue(build_bank.check("x", self.good(points=3)))
+        self.assertTrue(build_bank.check("x", self.good(points=4)))
+        self.assertEqual(build_bank.check("x", self.good(points=3)), [])
         self.assertTrue(build_bank.check("x", self.good(kind="number", answers=["0.5"])))
         self.assertTrue(build_bank.check("x", self.good(answers=["очень длинный ответ на задание"])))
 

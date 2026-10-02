@@ -12,11 +12,13 @@ local C = Ui.colors
 
 -- Ряд кнопок голосования. Возвращает рамку и функцию обновления (мой голос, голос соперника).
 local function voteRow(parent: Instance, y: number, title: string, options: { number }, suffix: string, onVote: (number) -> ())
-	Ui.caption(title, { Position = UDim2.fromOffset(20, y), Size = UDim2.fromOffset(400, 16), Parent = parent })
+	Ui.caption(title, { Position = UDim2.fromOffset(20, y), Size = UDim2.fromOffset(700, 16), Parent = parent })
 	local buttons, marks = {}, {}
 	for index, option in options do
 		local x = 20 + (index - 1) * 142
-		local button = Ui.button(option .. suffix, "plain", {
+		local button = Ui.button(if option == 0 then "вся часть 1" else option .. suffix, "plain", {
+			Name = "Vote" .. option,
+			TextSize = 15,
 			Position = UDim2.fromOffset(x, y + 22),
 			Size = UDim2.fromOffset(130, 40),
 			Parent = parent,
@@ -37,7 +39,10 @@ local function voteRow(parent: Instance, y: number, title: string, options: { nu
 			Parent = parent,
 		})
 	end
-	return function(mine: number, rivals: number)
+	return function(mine: number, rivals: number, fullText: string?)
+		if fullText and buttons[0] then
+			buttons[0].Text = fullText
+		end
 		for option, button in buttons do
 			Ui.styleButton(button, if option == mine then "selected" else "plain")
 			marks[option].Visible = option == rivals
@@ -124,7 +129,7 @@ function SetupScreen.create(parent: Instance, actions)
 	})
 
 	local updateTime = voteRow(frame, 312, "ВРЕМЯ НА РАБОТУ", Settings.timeOptions, " мин", actions.voteTime)
-	local updateCount = voteRow(frame, 402, "ЧИСЛО ЗАДАНИЙ", Settings.countOptions, "", actions.voteCount)
+	local updateCount = voteRow(frame, 402, "ЗАДАНИЯ: ВСЯ ПЕРВАЯ ЧАСТЬ ИЛИ СОКРАЩЁННЫЙ ВАРИАНТ ПО НОМЕРАМ", Settings.countOptions, "", actions.voteCount)
 
 	local status = Ui.label({
 		TextSize = 15,
@@ -172,7 +177,9 @@ function SetupScreen.create(parent: Instance, actions)
 		rivalReady.TextColor3 = if rival.ready then C.ok else C.muted
 
 		updateTime(me.time, rival.time)
-		updateCount(me.count, rival.count)
+		-- У предмета с разбивкой по номерам показываем размер первой части.
+		local full = me.subject and state.fullCounts and state.fullCounts[me.subject] or 0
+		updateCount(me.count, rival.count, if full > 0 then string.format("вся часть 1 (%d)", full) else "вся часть 1")
 
 		local notes = {}
 		if me.subject and me.subject == rival.subject then

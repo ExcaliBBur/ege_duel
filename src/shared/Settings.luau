@@ -1,8 +1,11 @@
 -- Настройки матча, общие для сервера и клиента.
 local Settings = {}
 
-Settings.timeOptions = { 10, 20, 30, 45 } -- минуты
-Settings.countOptions = { 8, 12, 16, 20 } -- число заданий
+Settings.timeOptions = { 10, 20, 30, 45, 60, 90 } -- минуты
+-- Число заданий. 0 означает всю первую часть экзамена; остальные значения дают сокращённый вариант,
+-- в котором номера идут по порядку и охватывают экзамен от начала до конца.
+Settings.countOptions = { 8, 12, 16, 0 }
+Settings.fullCount = 0
 Settings.defaultTime = 20
 Settings.defaultCount = 12
 

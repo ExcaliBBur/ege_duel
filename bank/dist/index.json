@@ -7,11 +7,11 @@
   },
   "math_base": {
    "file": "math_base.json",
-   "count": 324
+   "count": 420
   },
   "math_prof": {
    "file": "math_prof.json",
-   "count": 342
+   "count": 240
   },
   "physics": {
    "file": "physics.json",

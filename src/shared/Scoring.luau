@@ -29,8 +29,9 @@ local function gradeSet(given: string, expected: string, points: number): number
 	local errors = math.max(missing, extra)
 	if errors == 0 then
 		return points
-	elseif errors == 1 and points >= 2 then
-		return points - 1
+	elseif points >= 2 then
+		-- Как в ЕГЭ: каждая ошибка снимает один балл.
+		return math.max(0, points - errors)
 	end
 	return 0
 end
@@ -52,7 +53,7 @@ local function gradeOrder(given: string, expected: string, points: number): numb
 			mismatches += 1
 		end
 	end
-	return if mismatches == 1 then points - 1 else 0
+	return math.max(0, points - mismatches)
 end
 
 -- Сколько баллов даёт ответ rawAnswer на задание task.

@@ -48,22 +48,24 @@ samples.Name = "EgeTestSamples"
 samples.Parent = ReplicatedStorage
 samples.OnServerInvoke = function()
 	local wanted = {
-		math_base = { "fig_line_chart", "fig_grid_trapezoid", "fig_right_triangle" },
-		math_prof = { "fig_parabola", "fig_vector" },
-		physics = { "fig_xt_graph", "fig_circuit_series", "fig_circuit_parallel", "fig_forces", "fig_pv_work", "fig_iu_graph" },
-		informatics = { "fig_paths", "fig_spreadsheet" },
-		chemistry = { "fig_atom", "fig_skeleton" },
-		biology = { "fig_punnett", "fig_dna" },
-		geography = { "fig_climate", "fig_wind_rose" },
-		social = { "fig_poll", "fig_market" },
+		{ "math_base", { "b2_units", "b3_bar_chart", "b3_price_graph", "b6_carriers", "b6_internet", "b6_route", "b7_function_points",
+			"b7_speed_intervals", "b8_clubs", "b9_rhombus", "b9_plan", "b18_number_line", "b18_quadratic" } },
+		{ "math_prof", { "p1_right_triangle", "p1_circle_angles", "s_cylinder", "st_table", "d_graph_tangent", "d_graph_derivative",
+			"d_graph_points", "g_two_lines", "g_parabola", "g_hyperbola", "g_exponent", "g_logarithm", "g_root" } },
+		{ "physics", { "fig_xt_graph", "fig_circuit_series", "fig_circuit_parallel", "fig_forces", "fig_pv_work", "fig_iu_graph" } },
+		{ "informatics", { "fig_paths", "fig_spreadsheet" } },
+		{ "chemistry", { "fig_atom", "fig_skeleton" } },
+		{ "biology", { "fig_punnett", "fig_dna" } },
+		{ "geography", { "fig_climate", "fig_wind_rose" } },
+		{ "social", { "fig_poll", "fig_market" } },
 	}
 	local picked = {}
 	local Bank = require(game:GetService("ServerScriptService"):WaitForChild("Server"):WaitForChild("Bank"))
-	for subject, groups in wanted do
-		for _, group in groups do
-			for _, task in Bank.getTasks(subject) do
+	for _, entry in wanted do
+		for _, group in entry[2] do
+			for _, task in Bank.getTasks(entry[1]) do
 				if task.group == group then
-					table.insert(picked, { text = task.text, points = task.points, figure = task.figure })
+					table.insert(picked, { text = task.text, points = task.points, figure = task.figure, number = task.number, topic = task.topic })
 					break
 				end
 			end

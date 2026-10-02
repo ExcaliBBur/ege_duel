@@ -189,7 +189,7 @@ function ResultsScreen.create(parent: Instance, actions)
 
 		local yours = if item.your == "" then "ответа нет" else "ваш ответ: " .. item.your
 		Ui.label({
-			Text = string.format("№ %d · %d из %d · %s · верно: %s", index, item.earned, item.points, yours, item.correct),
+			Text = string.format("№ %d · %d из %d · %s · верно: %s", item.number or index, item.earned, item.points, yours, item.correct),
 			Font = Ui.fonts.bold,
 			TextSize = 15,
 			TextColor3 = if full then C.ok elseif item.earned > 0 then C.warn else C.danger,

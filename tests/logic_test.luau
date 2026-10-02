@@ -63,6 +63,10 @@ equal(grade("order", 2, { "213" }, "211"), 1, "order: одна ошибка да
 equal(grade("order", 2, { "213" }, "123"), 0, "order: две ошибки")
 equal(grade("order", 2, { "213" }, "21"), 0, "order: не та длина")
 equal(grade("order", 1, { "2413" }, "2431"), 0, "order на 1 балл: только точное совпадение")
+equal(grade("order", 3, { "2413" }, "2431"), 1, "order на 3 балла: две ошибки дают 1 балл")
+equal(grade("order", 3, { "2413" }, "2414"), 2, "order на 3 балла: одна ошибка даёт 2 балла")
+equal(grade("set", 3, { "135" }, "13"), 2, "set на 3 балла: одна ошибка даёт 2 балла")
+equal(grade("exact", 1, { "722", "272" }, "272"), 1, "exact: задание с несколькими подходящими числами")
 
 -- ---------------------------------------------------------------- Scoring.summarize и decide
 
@@ -128,6 +132,48 @@ end
 check(differs, "Variant: другой seed даёт другой вариант")
 equal(#Variant.pick(pool, 50, 1), 20, "Variant: не больше, чем есть в банке")
 equal(#Variant.pick({}, 8, 1), 0, "Variant: пустой банк")
+equal(#Variant.pick(pool, 0, 1), 20, "Variant: без номеров вся часть это 20 заданий")
+
+-- Банк, разбитый по номерам ЕГЭ: номера 1-12, кроме пропущенного 7, по три задания на номер.
+local numbered = {}
+for number = 12, 1, -1 do
+	if number ~= 7 then
+		for n = 1, 3 do
+			table.insert(numbered, { id = number .. "-" .. n, number = number })
+		end
+	end
+end
+local function numbersIn(variant)
+	local list = {}
+	for _, task in variant do
+		table.insert(list, task.number)
+	end
+	return table.concat(list, " ")
+end
+equal(numbersIn(Variant.pick(numbered, 0, 5)), "1 2 3 4 5 6 8 9 10 11 12", "Variant: вся первая часть по порядку номеров")
+equal(numbersIn(Variant.pick(numbered, 16, 5)), "1 2 3 4 5 6 8 9 10 11 12", "Variant: просят больше, чем есть номеров")
+local short = Variant.pick(numbered, 4, 5)
+equal(#short, 4, "Variant: сокращённый вариант нужной длины")
+local ascending, spread = true, true
+for index, task in short do
+	ascending = ascending and (index == 1 or short[index - 1].number < task.number)
+end
+-- 11 номеров на 4 группы: границы групп после 2-го, 5-го и 8-го номера по счёту.
+spread = short[1].number <= 2 and short[2].number >= 3 and short[2].number <= 5 and short[4].number >= 10
+check(ascending, "Variant: в сокращённом варианте номера идут по возрастанию")
+check(spread, "Variant: сокращённый вариант охватывает экзамен от начала до конца")
+equal(numbersIn(Variant.pick(numbered, 4, 5)), numbersIn(short), "Variant: один seed даёт те же номера")
+local variety = {}
+for seed = 1, 40 do
+	variety[numbersIn(Variant.pick(numbered, 4, seed))] = true
+	variety[Variant.pick(numbered, 0, seed)[1].id] = true
+end
+local kinds = 0
+for _ in variety do
+	kinds += 1
+end
+check(kinds > 6, "Variant: разные seed дают разные номера и разные задания")
+equal(table.concat(Variant.numbersOf(numbered), " "), "1 2 3 4 5 6 8 9 10 11 12", "Variant.numbersOf: номера по возрастанию")
 
 -- ---------------------------------------------------------------- Duel: матч целиком
 
@@ -400,6 +446,50 @@ equal(last(fedor).phase, "none", "игрок встал")
 advance(60)
 equal(t2.status, "Свободно", "тестовый соперник уходит вместе с игроком")
 check(t2.prompts[2].Enabled, "место тестового соперника снова свободно")
+
+-- Предмет, разбитый по номерам ЕГЭ: вся первая часть.
+local numberedTasks = {}
+for number = 1, 12 do
+	for n = 1, 3 do
+		table.insert(numberedTasks, {
+			id = "мат" .. number .. "-" .. n,
+			number = number,
+			topic = "Тема " .. number,
+			text = "мат вопрос " .. number,
+			answers = { tostring(number) },
+			points = 1,
+			kind = "number",
+			explanation = "пояснение",
+		})
+	end
+end
+mockTasks.math_prof = numberedTasks
+t2.prompts[1].Triggered:Fire(fedor)
+act(fedor, "addBot")
+equal(last(fedor).fullCounts.math_prof, 12, "в настройке есть размер первой части")
+equal(last(fedor).fullCounts.russian, 0, "у предмета без номеров размер первой части не указан")
+act(fedor, "setSubject", "math_prof")
+act(fedor, "voteTime", 90)
+act(fedor, "voteCount", 20)
+equal(last(fedor).me.count ~= 20, true, "старое число заданий 20 отклонено")
+act(fedor, "voteCount", 0)
+equal(last(fedor).rival.count, 0, "тестовый соперник соглашается на всю первую часть")
+act(fedor, "ready", true)
+advance(3.1)
+equal(last(fedor).phase, "exam", "экзамен по всей первой части")
+equal(#last(fedor).tasks, 12, "вся первая часть: по заданию на каждый номер")
+local inOrder = true
+for index, task in last(fedor).tasks do
+	inOrder = inOrder and task.number == index and task.topic == "Тема " .. index
+end
+check(inOrder, "задания идут по номерам ЕГЭ и несут тему")
+equal(last(fedor).tasks[1].answers, nil, "ответы не уходят клиенту")
+act(fedor, "answer", { index = 3, value = "3" })
+act(fedor, "submit")
+equal(last(fedor).review[3].number, 3, "в разборе указан номер ЕГЭ")
+equal(last(fedor).me.correct, 1, "верный ответ по номеру засчитан")
+act(fedor, "leave")
+advance(60)
 
 -- Калькулятор из справочных материалов.
 local function calc(keys)

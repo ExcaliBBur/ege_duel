@@ -132,6 +132,15 @@ local function bankCounts()
 	return counts
 end
 
+-- Размер первой части по предметам, чтобы на экране настройки было видно, сколько заданий в полном варианте.
+local function fullCounts()
+	local counts = {}
+	for _, subject in Subjects.list do
+		counts[subject.id] = Bank.fullCount(subject.id)
+	end
+	return counts
+end
+
 local function rivalProgress(slot)
 	return {
 		answered = slot.answered,
@@ -151,6 +160,7 @@ local function snapshotFor(tbl, slot)
 			phase = "setup",
 			tableId = tbl.id,
 			counts = bankCounts(),
+			fullCounts = fullCounts(),
 			me = { subject = slot.subject, time = slot.timeVote, count = slot.countVote, ready = slot.ready },
 			rival = {
 				name = rival.name,
@@ -178,7 +188,13 @@ local function snapshotFor(tbl, slot)
 		local publicTasks = {}
 		for index, task in slot.tasks do
 			-- Правильные ответы клиенту не отправляются.
-			publicTasks[index] = { text = task.text, points = task.points, figure = task.figure }
+			publicTasks[index] = {
+				text = task.text,
+				points = task.points,
+				figure = task.figure,
+				number = task.number,
+				topic = task.topic,
+			}
 		end
 		local progress = rivalProgress(rival)
 		progress.name = rival.name
@@ -330,6 +346,7 @@ local function buildReview(slot)
 			earned = slot.summary.perTask[index],
 			explanation = task.explanation,
 			figure = task.figure,
+			number = task.number,
 		}
 	end
 	return review

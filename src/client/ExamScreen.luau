@@ -17,7 +17,7 @@ local ExamScreen = {}
 
 local C = Ui.colors
 local CELLS = Settings.answerMaxChars
-local MAX_TASKS = 20
+local MAX_TASKS = 30 -- самая длинная первая часть: 28 заданий по химии
 
 local function serverNow(): number
 	return Workspace:GetServerTimeNow()
@@ -102,6 +102,7 @@ function ExamScreen.create(parent: Instance, actions)
 			Name = "Nav" .. index,
 			Font = Ui.fonts.mono,
 			TextSize = 16,
+			TextWrapped = false,
 			Position = UDim2.fromOffset(20 + (index - 1) * 44, 112),
 			Size = UDim2.fromOffset(38, 34),
 			Visible = false,
@@ -156,6 +157,26 @@ function ExamScreen.create(parent: Instance, actions)
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Parent = taskScroll,
 	})
+
+	-- Длинное задание (соответствие, выбор утверждений) может не поместиться: подсказываем, что его надо прокрутить.
+	local moreHint = Ui.label({
+		Name = "MoreHint",
+		Text = "▼ задание продолжается ниже, прокрутите",
+		TextSize = 13,
+		TextColor3 = C.muted,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		Position = UDim2.new(1, -400, 0, 150),
+		Size = UDim2.fromOffset(328, 16),
+		Visible = false,
+		Parent = frame,
+	})
+	local function updateMoreHint()
+		local hidden = taskScroll.AbsoluteCanvasSize.Y - taskScroll.AbsoluteWindowSize.Y - taskScroll.CanvasPosition.Y
+		moreHint.Visible = hidden > 8
+	end
+	taskScroll:GetPropertyChangedSignal("AbsoluteCanvasSize"):Connect(updateMoreHint)
+	taskScroll:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(updateMoreHint)
+	taskScroll:GetPropertyChangedSignal("CanvasPosition"):Connect(updateMoreHint)
 
 	-- Поле ответа: настоящий TextBox невидим и лежит поверх клеток, клетки показывают введённые символы.
 	Ui.caption("ОТВЕТ", { Position = UDim2.fromOffset(20, 466), Size = UDim2.fromOffset(100, 16), Parent = frame })
@@ -338,6 +359,19 @@ function ExamScreen.create(parent: Instance, actions)
 		end
 	end
 
+	-- Кнопки навигатора показывают настоящие номера заданий ЕГЭ и сжимаются, если заданий много.
+	local function layoutNav()
+		local count = math.max(#tasks, 1)
+		local step = math.min(44, math.floor(880 / count))
+		for index, button in navButtons do
+			local task = tasks[index]
+			button.Position = UDim2.fromOffset(20 + (index - 1) * step, 112)
+			button.Size = UDim2.fromOffset(step - 6, 34)
+			button.TextSize = if step < 36 then 13 else 16
+			button.Text = if task then tostring(task.number or index) else ""
+		end
+	end
+
 	local function renderNav()
 		for index, button in navButtons do
 			if index <= #tasks then
@@ -367,9 +401,17 @@ function ExamScreen.create(parent: Instance, actions)
 		if not task then
 			return
 		end
-		titleLabel.Text = string.format("%s · задание %d из %d", subjectName, current, #tasks)
-		pointsLabel.Text = if task.points == 2 then "2 БАЛЛА" else "1 БАЛЛ"
+		if task.number then
+			titleLabel.Text = string.format("%s · задание №%d (%d из %d)", subjectName, task.number, current, #tasks)
+		else
+			titleLabel.Text = string.format("%s · задание %d из %d", subjectName, current, #tasks)
+		end
+		local pointsText = if task.points >= 2 then task.points .. " БАЛЛА" else "1 БАЛЛ"
+		pointsLabel.Text = if task.topic then string.upper(pointsText) .. " · " .. task.topic else pointsText
 		taskLabel.Text = task.text
+		-- Длинные задания набираются мельче, чтобы варианты ответа были видны без прокрутки.
+		local length = utf8.len(task.text) or #task.text
+		taskLabel.TextSize = if length > 520 then 15 elseif length > 300 then 17 else 19
 		if figureFrame then
 			figureFrame:Destroy()
 			figureFrame = nil
@@ -596,6 +638,7 @@ function ExamScreen.create(parent: Instance, actions)
 		input.TextEditable = true
 		confirmShade.Visible = false
 		doneCover.Visible = false
+		layoutNav()
 		renderTask()
 		frame.Visible = true
 	end
