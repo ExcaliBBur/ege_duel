@@ -56,7 +56,7 @@ def sequence_generator(name, table):
 def term_generator(name, table, lead):
     def generator(r):
         description, answers = r.choice(table)
-        return exact(f"{lead} {description} Запишите ответ одним словом или словосочетанием.", answers, f"Это {answers[0]}.")
+        return exact(f"{lead} {description} Запишите ответ одним словом или словосочетанием.", answers, f"Ответ: {answers[0]}.")
     generator.__name__ = name
     return generator
 

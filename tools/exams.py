@@ -7,6 +7,7 @@ SKIPPED: номера первой части, которые нельзя пе�
 
 import exam_biology
 import exam_chemistry
+import exam_geography
 import exam_history
 import exam_informatics
 import exam_math_base
@@ -25,11 +26,12 @@ EXAMS = {
     "history": exam_history.NUMBERS,
     "chemistry": exam_chemistry.NUMBERS,
     "biology": exam_biology.NUMBERS,
+    "geography": exam_geography.NUMBERS,
 }
 
 # Сколько разных заданий должно набираться на каждый номер. В предметах с вычисляемыми заданиями это 20,
 # а там, где задания привязаны к авторским текстам, их меньше.
-MINIMUM = {"russian": 4, "social": 12, "biology": 12}
+MINIMUM = {"russian": 4, "social": 12, "biology": 12, "geography": 6}
 DEFAULT_MINIMUM = 20
 
 # Сколько заданий в первой части (с кратким ответом) у каждого предмета.
